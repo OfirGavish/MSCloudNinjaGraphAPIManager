@@ -1,7 +1,19 @@
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.csproj.AssemblyReference.cache
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.MainForm.resources
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.csproj.GenerateResource.cache
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.AssemblyInfoInputs.cache
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.AssemblyInfo.cs
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.csproj.CoreCompileInputs.cache
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.sourcelink.json
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\MSCloudNinja GraphAPI Manager.exe
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\MSCloudNinja GraphAPI Manager.deps.json
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\MSCloudNinja GraphAPI Manager.runtimeconfig.json
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\MSCloudNinja GraphAPI Manager.dll
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\MSCloudNinja GraphAPI Manager.pdb
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Azure.Core.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Azure.Identity.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.Bcl.AsyncInterfaces.dll
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.Bcl.TimeProvider.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.Graph.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.Graph.Core.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.Identity.Client.dll
@@ -13,7 +25,6 @@ C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.IdentityModel.Protocols.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.IdentityModel.Tokens.dll
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.IdentityModel.Validators.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.Kiota.Abstractions.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.Kiota.Authentication.Azure.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.Kiota.Http.HttpClientLibrary.dll
@@ -24,8 +35,8 @@ C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.Web.WebView2.Core.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.Web.WebView2.WinForms.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.Web.WebView2.Wpf.dll
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Newtonsoft.Json.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Std.UriTemplate.dll
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\System.ClientModel.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\System.IdentityModel.Tokens.Jwt.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\System.Memory.Data.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\runtimes\win-arm64\native\msalruntime_arm64.dll
@@ -34,22 +45,10 @@ C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\runtimes\win-arm64\native\WebView2Loader.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\runtimes\win-x64\native\WebView2Loader.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\runtimes\win-x86\native\WebView2Loader.dll
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.csproj.AssemblyReference.cache
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.MainForm.resources
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.csproj.GenerateResource.cache
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.GeneratedMSBuildEditorConfig.editorconfig
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.AssemblyInfoInputs.cache
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.AssemblyInfo.cs
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.csproj.CoreCompileInputs.cache
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudN.334B8716.Up2Date
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.genruntimeconfig.cache
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\MSCloudNinja GraphAPI Manager.exe
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\MSCloudNinja GraphAPI Manager.deps.json
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\MSCloudNinja GraphAPI Manager.runtimeconfig.json
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\MSCloudNinja GraphAPI Manager.dll
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\MSCloudNinja GraphAPI Manager.pdb
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinja GraphAPI Manager.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\refint\MSCloudNinja GraphAPI Manager.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinja GraphAPI Manager.pdb
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.genruntimeconfig.cache
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\ref\MSCloudNinja GraphAPI Manager.dll
-C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Newtonsoft.Json.dll
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.Graph.Beta.dll

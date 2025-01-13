@@ -32,30 +32,33 @@ namespace MSCloudNinjaGraphAPI
         /// </summary>
         private void InitializeComponent()
         {
-            this.mainContent = new System.Windows.Forms.Panel();
-            this.headerPanel = new System.Windows.Forms.Panel();
-            this.SuspendLayout();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
+            mainContent = new Panel();
+            headerPanel = new Panel();
+            SuspendLayout();
             // 
             // mainContent
             // 
-            this.mainContent.Location = new System.Drawing.Point(12, 62);
-            this.mainContent.Name = "mainContent";
-            this.mainContent.Size = new System.Drawing.Size(776, 376);
-            this.mainContent.TabIndex = 2;
+            mainContent.Location = new Point(12, 62);
+            mainContent.Name = "mainContent";
+            mainContent.Size = new Size(776, 376);
+            mainContent.TabIndex = 2;
             // 
             // headerPanel
             // 
-            this.headerPanel.Location = new System.Drawing.Point(12, 12);
-            this.headerPanel.Name = "headerPanel";
-            this.headerPanel.Size = new System.Drawing.Size(776, 50);
-            this.headerPanel.TabIndex = 1;
+            headerPanel.Location = new Point(12, 12);
+            headerPanel.Name = "headerPanel";
+            headerPanel.Size = new Size(776, 50);
+            headerPanel.TabIndex = 1;
             // 
             // MainForm
             // 
-            this.Controls.Add(this.mainContent);
-            this.Controls.Add(this.headerPanel);
-            this.ResumeLayout(false);
-
+            ClientSize = new Size(278, 244);
+            Controls.Add(mainContent);
+            Controls.Add(headerPanel);
+            Icon = (Icon)resources.GetObject("$this.Icon");
+            Name = "MainForm";
+            ResumeLayout(false);
         }
 
         #endregion

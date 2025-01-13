@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -12,23 +12,37 @@
     <Company>MSCloudNinja</Company>
     <Description>A tool for managing Microsoft Graph APIs</Description>
     <StartupObject>MSCloudNinjaGraphAPI.Program</StartupObject>
+    <SignAssembly>False</SignAssembly>
+    <Copyright>MSCloudNinja</Copyright>
+    <PackageIcon>logo.png</PackageIcon>
+    <FileVersion>1.1.3</FileVersion>
+    <ApplicationIcon>logo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Azure.Identity" Version="1.10.4">
-      <NoWarn>NU1902</NoWarn>
-    </PackageReference>
-    <PackageReference Include="Microsoft.Graph" Version="5.68.0" />
-    <PackageReference Include="Microsoft.Graph.Core" Version="3.2.1" />
-    <PackageReference Include="Microsoft.Identity.Client" Version="4.58.1" />
-    <PackageReference Include="Microsoft.Kiota.Abstractions" Version="1.15.2" />
-    <PackageReference Include="Microsoft.Kiota.Http.HttpClientLibrary" Version="1.15.2" />
-    <PackageReference Include="Microsoft.Kiota.Authentication.Azure" Version="1.15.2" />
+    <Content Include="logo.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.10.4" />
+    <PackageReference Include="Microsoft.Graph" Version="5.36.0" />
+    <PackageReference Include="Microsoft.Graph.Core" Version="3.1.2" />
+    <PackageReference Include="Microsoft.Graph.Beta" Version="5.47.0-preview" />
+    <PackageReference Include="Microsoft.Kiota.Abstractions" Version="1.7.2" />
+    <PackageReference Include="Microsoft.Kiota.Http.HttpClientLibrary" Version="1.3.2" />
+    <PackageReference Include="Microsoft.Kiota.Authentication.Azure" Version="1.1.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="logo.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\..\Downloads\logo.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>

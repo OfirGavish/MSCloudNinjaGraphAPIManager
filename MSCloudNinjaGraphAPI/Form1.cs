@@ -51,20 +51,18 @@ namespace MSCloudNinjaGraphAPI
         private GraphServiceClient _graphClient = null!;
         private readonly string[] _scopes = new[] 
         { 
-            "https://graph.microsoft.com/Policy.Read.All",
-            "https://graph.microsoft.com/Policy.ReadWrite.ConditionalAccess",
-            "https://graph.microsoft.com/Application.Read.All",
-            "https://graph.microsoft.com/DeviceManagementConfiguration.Read.All",
-            "https://graph.microsoft.com/DeviceManagementConfiguration.ReadWrite.All",
-            "https://graph.microsoft.com/DeviceManagementApps.Read.All",
-            "https://graph.microsoft.com/DeviceManagementApps.ReadWrite.All",
-            "https://graph.microsoft.com/DeviceManagementManagedDevices.Read.All",
-            "https://graph.microsoft.com/DeviceManagementManagedDevices.ReadWrite.All",
-            "https://graph.microsoft.com/DeviceManagementServiceConfig.Read.All",
-            "https://graph.microsoft.com/DeviceManagementServiceConfig.ReadWrite.All"
+            "Policy.Read.All",
+            "Policy.ReadWrite.ConditionalAccess",
+            "Application.Read.All",
+            "DeviceManagementConfiguration.Read.All",
+            "DeviceManagementConfiguration.ReadWrite.All",
+            "DeviceManagementApps.Read.All",
+            "DeviceManagementApps.ReadWrite.All",
+            "DeviceManagementManagedDevices.Read.All",
+            "DeviceManagementManagedDevices.ReadWrite.All",
+            "DeviceManagementServiceConfig.Read.All",
+            "DeviceManagementServiceConfig.ReadWrite.All"
         };
-
-        private const string ClientId = "14d82eec-204b-4c2f-b7e8-296a70dab67e"; // Microsoft Graph PowerShell ClientId
 
         private Panel authPanel = null!;
         private Button browserAuthButton = null!;
@@ -242,51 +240,24 @@ namespace MSCloudNinjaGraphAPI
             try
             {
                 statusLabel.Text = "Opening browser for authentication...";
-                Application.DoEvents();
+                System.Windows.Forms.Application.DoEvents();
 
-                // Initialize the MSAL client
-                var app = PublicClientApplicationBuilder
-                    .Create(ClientId)
-                    .WithRedirectUri("http://localhost")
-                    .WithAuthority(AzureCloudInstance.AzurePublic, "organizations")
-                    .Build();
-
-                // Try to acquire token silently first
-                AuthenticationResult authResult;
-                try
+                var options = new InteractiveBrowserCredentialOptions
                 {
-                    var accounts = await app.GetAccountsAsync();
-                    authResult = await app.AcquireTokenSilent(_scopes, accounts.FirstOrDefault())
-                        .ExecuteAsync();
-                }
-                catch (MsalUiRequiredException)
-                {
-                    // No token in cache or expired, need to sign in interactively
-                    authResult = await app.AcquireTokenInteractive(_scopes)
-                        .WithPrompt(Prompt.SelectAccount)
-                        .ExecuteAsync();
-                }
-
-                // Create auth provider using the token
-                var authProvider = new BaseBearerTokenAuthenticationProvider(
-                    new TokenProvider(authResult.AccessToken));
-
-                var requestAdapter = new HttpClientRequestAdapter(authProvider)
-                {
-                    BaseUrl = "https://graph.microsoft.com/v1.0"
+                    TenantId = "organizations"
                 };
+
+                var credential = new InteractiveBrowserCredential(options);
+                var authProvider = new AzureIdentityAuthenticationProvider(credential);
+                var requestAdapter = new HttpClientRequestAdapter(authProvider);
                 _graphClient = new GraphServiceClient(requestAdapter);
 
-                // Test authentication
-                var user = await _graphClient.Users.GetAsync(requestConfiguration =>
-                {
-                    requestConfiguration.QueryParameters.Top = 1;
-                    requestConfiguration.QueryParameters.Select = new[] { "id", "displayName" };
-                });
+                // Test authentication by making a simple API call
+                var users = await _graphClient.Users.GetAsync();
 
-                if (user?.Value?.FirstOrDefault() != null)
+                if (users?.Value?.FirstOrDefault() != null)
                 {
-                    statusLabel.Text = $"Authentication successful! Welcome {user.Value.First().DisplayName}";
+                    statusLabel.Text = $"Authentication successful! Welcome {users.Value.First().DisplayName}";
                     InitializeMainInterface();
                 }
                 else
@@ -316,7 +287,7 @@ namespace MSCloudNinjaGraphAPI
                 }
 
                 statusLabel.Text = "Initializing app registration authentication...";
-                Application.DoEvents();
+                System.Windows.Forms.Application.DoEvents();
 
                 var credentials = new ClientSecretCredential(
                     tenantIdTextBox.Text,
@@ -359,13 +330,55 @@ namespace MSCloudNinjaGraphAPI
                 // Make sure mainContent is visible
                 mainContent.Visible = true;
 
-                // Initialize both controls
-                conditionalAccessControl = new ConditionalAccessControl(_graphClient);
-                enterpriseAppsControl = new EnterpriseAppsControl(_graphClient);
-                intuneControl = new IntuneControl(_graphClient);
+                bool hasAnyAccess = false;
+                bool hasConditionalAccess = false;
+                bool hasEnterpriseApps = false;
+                bool hasIntune = false;
 
-                // Show Conditional Access by default
-                SwitchToControl(conditionalAccessControl);
+                // Try initializing each control separately
+                try
+                {
+                    conditionalAccessControl = new ConditionalAccessControl(_graphClient);
+                    hasConditionalAccess = true;
+                    hasAnyAccess = true;
+                }
+                catch (Exception) { }
+
+                try 
+                {
+                    enterpriseAppsControl = new EnterpriseAppsControl(_graphClient);
+                    hasEnterpriseApps = true;
+                    hasAnyAccess = true;
+                }
+                catch (Exception) { }
+
+                try
+                {
+                    intuneControl = new IntuneControl(_graphClient);
+                    hasIntune = true;
+                    hasAnyAccess = true;
+                }
+                catch (Exception) { }
+
+                if (!hasAnyAccess)
+                {
+                    throw new Exception("Insufficient permissions to access any functionality");
+                }
+
+                // Show warning if some controls are not available
+                if (!(hasConditionalAccess && hasEnterpriseApps && hasIntune))
+                {
+                    MessageBox.Show("Only the parts your user or application has access to will be available", 
+                        "Limited Access", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
+
+                // Show first available control
+                if (hasConditionalAccess)
+                    SwitchToControl(conditionalAccessControl);
+                else if (hasEnterpriseApps)
+                    SwitchToControl(enterpriseAppsControl);
+                else if (hasIntune)
+                    SwitchToControl(intuneControl);
 
                 // Force a redraw
                 mainContent.Invalidate(true);
@@ -373,7 +386,7 @@ namespace MSCloudNinjaGraphAPI
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error initializing interface: {ex.Message}", "Initialization Error",
+                MessageBox.Show($"Error during authentication: {ex.Message}", "Authentication Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -388,7 +401,7 @@ namespace MSCloudNinjaGraphAPI
                 string projectRoot = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(exePath), "..", "..", ".."));
                 string logoPath = Path.Combine(projectRoot, "assets", "logo.png");
                 
-                if (File.Exists(logoPath))
+                if (System.IO.File.Exists(logoPath))
                 {
                     using (var bitmap = new Bitmap(logoPath))
                     {
