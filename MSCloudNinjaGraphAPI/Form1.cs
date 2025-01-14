@@ -7,6 +7,7 @@ using System.Windows.Forms;
 using System.Reflection;
 using System.IO;
 using Azure.Identity;
+using Azure.Core;
 using Microsoft.Kiota.Authentication.Azure;
 using Microsoft.Kiota.Http.HttpClientLibrary;
 using Microsoft.Kiota.Abstractions;
@@ -49,11 +50,16 @@ namespace MSCloudNinjaGraphAPI
         }
 
         private GraphServiceClient _graphClient = null!;
+        private GraphServiceClient _intuneGraphClient = null!;
         private readonly string[] _scopes = new[] 
         { 
             "Policy.Read.All",
             "Policy.ReadWrite.ConditionalAccess",
-            "Application.Read.All",
+            "Application.Read.All"
+        };
+
+        private readonly string[] _intuneScopes = new[]
+        {
             "DeviceManagementConfiguration.Read.All",
             "DeviceManagementConfiguration.ReadWrite.All",
             "DeviceManagementApps.Read.All",
@@ -237,32 +243,88 @@ namespace MSCloudNinjaGraphAPI
 
         private async void BrowserAuthButton_Click(object sender, EventArgs e)
         {
+            bool mainAuthSuccess = false;
+            bool intuneAuthSuccess = false;
+            string userName = "";
+
             try
             {
                 statusLabel.Text = "Opening browser for authentication...";
                 System.Windows.Forms.Application.DoEvents();
 
-                var options = new InteractiveBrowserCredentialOptions
+                // Main authentication for Conditional Access and Enterprise Apps
+                try 
                 {
-                    TenantId = "organizations"
-                };
+                    var mainOptions = new InteractiveBrowserCredentialOptions
+                    {
+                        TenantId = "organizations"
+                    };
 
-                var credential = new InteractiveBrowserCredential(options);
-                var authProvider = new AzureIdentityAuthenticationProvider(credential);
-                var requestAdapter = new HttpClientRequestAdapter(authProvider);
-                _graphClient = new GraphServiceClient(requestAdapter);
+                    var mainCredential = new InteractiveBrowserCredential(mainOptions);
+                    var mainToken = await mainCredential.GetTokenAsync(new TokenRequestContext(_scopes.Select(s => $"https://graph.microsoft.com/{s}").ToArray()));
+                    var mainAuthProvider = new BaseBearerTokenAuthenticationProvider(new TokenProvider(mainToken.Token));
+                    var mainRequestAdapter = new HttpClientRequestAdapter(mainAuthProvider);
+                    _graphClient = new GraphServiceClient(mainRequestAdapter);
 
-                // Test authentication by making a simple API call
-                var users = await _graphClient.Users.GetAsync();
-
-                if (users?.Value?.FirstOrDefault() != null)
+                    // Test main authentication
+                    var users = await _graphClient.Users.GetAsync();
+                    if (users?.Value?.FirstOrDefault() != null)
+                    {
+                        mainAuthSuccess = true;
+                        userName = users.Value.First().DisplayName;
+                        statusLabel.Text = $"Main authentication successful! Welcome {userName}";
+                    }
+                }
+                catch (Exception ex)
                 {
-                    statusLabel.Text = $"Authentication successful! Welcome {users.Value.First().DisplayName}";
+                    System.Diagnostics.Debug.WriteLine($"Main authentication failed: {ex.Message}");
+                    _graphClient = null;
+                }
+
+                // Separate authentication for Intune using Graph PowerShell client ID
+                try
+                {
+                    var intuneOptions = new InteractiveBrowserCredentialOptions
+                    {
+                        TenantId = "organizations",
+                        ClientId = "14d82eec-204b-4c2f-b7e8-296a70dab67e", // Microsoft Graph PowerShell
+                        RedirectUri = new Uri("http://localhost"),
+                        AuthorityHost = AzureAuthorityHosts.AzurePublicCloud
+                    };
+
+                    var intuneCredential = new InteractiveBrowserCredential(intuneOptions);
+                    var intuneToken = await intuneCredential.GetTokenAsync(new TokenRequestContext(_intuneScopes.Select(s => $"https://graph.microsoft.com/{s}").ToArray()));
+                    var intuneAuthProvider = new BaseBearerTokenAuthenticationProvider(new TokenProvider(intuneToken.Token));
+                    var intuneRequestAdapter = new HttpClientRequestAdapter(intuneAuthProvider);
+                    _intuneGraphClient = new GraphServiceClient(intuneRequestAdapter);
+                    
+                    intuneAuthSuccess = true;
+                    statusLabel.Text += "\nIntune authentication successful!";
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Intune authentication failed: {ex.Message}");
+                    _intuneGraphClient = null;
+                }
+
+                // Proceed if at least one authentication was successful
+                if (mainAuthSuccess || intuneAuthSuccess)
+                {
+                    if (mainAuthSuccess && intuneAuthSuccess)
+                    {
+                        statusLabel.Text = $"Authentication successful! Welcome {userName}";
+                    }
+                    else
+                    {
+                        MessageBox.Show("Only the parts your user or application has access to will be available", 
+                            "Limited Access", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        statusLabel.Text = $"Partial authentication successful! Welcome {userName}";
+                    }
                     InitializeMainInterface();
                 }
                 else
                 {
-                    throw new Exception("Could not verify user authentication");
+                    throw new Exception("Authentication failed for all services");
                 }
             }
             catch (Exception ex)
@@ -316,6 +378,23 @@ namespace MSCloudNinjaGraphAPI
             }
         }
 
+        private class TokenProvider : IAccessTokenProvider
+        {
+            private readonly string _token;
+
+            public TokenProvider(string token)
+            {
+                _token = token;
+            }
+
+            public AllowedHostsValidator AllowedHostsValidator { get; } = new AllowedHostsValidator();
+
+            public Task<string> GetAuthorizationTokenAsync(Uri uri, Dictionary<string, object> additionalAuthenticationContext = default, CancellationToken cancellationToken = default)
+            {
+                return Task.FromResult(_token);
+            }
+        }
+
         private void InitializeMainInterface()
         {
             try
@@ -330,55 +409,19 @@ namespace MSCloudNinjaGraphAPI
                 // Make sure mainContent is visible
                 mainContent.Visible = true;
 
-                bool hasAnyAccess = false;
-                bool hasConditionalAccess = false;
-                bool hasEnterpriseApps = false;
-                bool hasIntune = false;
-
-                // Try initializing each control separately
-                try
+                // Initialize controls with appropriate clients
+                if (_graphClient != null)
                 {
                     conditionalAccessControl = new ConditionalAccessControl(_graphClient);
-                    hasConditionalAccess = true;
-                    hasAnyAccess = true;
-                }
-                catch (Exception) { }
-
-                try 
-                {
                     enterpriseAppsControl = new EnterpriseAppsControl(_graphClient);
-                    hasEnterpriseApps = true;
-                    hasAnyAccess = true;
-                }
-                catch (Exception) { }
-
-                try
-                {
-                    intuneControl = new IntuneControl(_graphClient);
-                    hasIntune = true;
-                    hasAnyAccess = true;
-                }
-                catch (Exception) { }
-
-                if (!hasAnyAccess)
-                {
-                    throw new Exception("Insufficient permissions to access any functionality");
-                }
-
-                // Show warning if some controls are not available
-                if (!(hasConditionalAccess && hasEnterpriseApps && hasIntune))
-                {
-                    MessageBox.Show("Only the parts your user or application has access to will be available", 
-                        "Limited Access", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-
-                // Show first available control
-                if (hasConditionalAccess)
+                    // Show Conditional Access by default if available
                     SwitchToControl(conditionalAccessControl);
-                else if (hasEnterpriseApps)
-                    SwitchToControl(enterpriseAppsControl);
-                else if (hasIntune)
-                    SwitchToControl(intuneControl);
+                }
+                
+                if (_intuneGraphClient != null)
+                {
+                    intuneControl = new IntuneControl(_intuneGraphClient);
+                }
 
                 // Force a redraw
                 mainContent.Invalidate(true);
@@ -386,7 +429,7 @@ namespace MSCloudNinjaGraphAPI
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error during authentication: {ex.Message}", "Authentication Error",
+                MessageBox.Show($"Error initializing interface: {ex.Message}", "Initialization Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -537,23 +580,6 @@ namespace MSCloudNinjaGraphAPI
         {
             [DllImport("user32.dll", CharSet = CharSet.Auto)]
             public static extern bool DestroyIcon(IntPtr handle);
-        }
-
-        private class TokenProvider : IAccessTokenProvider
-        {
-            private readonly string _token;
-
-            public TokenProvider(string token)
-            {
-                _token = token;
-            }
-
-            public AllowedHostsValidator AllowedHostsValidator { get; } = new AllowedHostsValidator();
-
-            public Task<string> GetAuthorizationTokenAsync(Uri uri, Dictionary<string, object> additionalAuthenticationContext = default, CancellationToken cancellationToken = default)
-            {
-                return Task.FromResult(_token);
-            }
         }
 
         private void btnConditionalAccess_Click(object sender, EventArgs e)
