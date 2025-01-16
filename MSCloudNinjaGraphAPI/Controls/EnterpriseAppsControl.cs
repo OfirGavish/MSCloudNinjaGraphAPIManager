@@ -192,7 +192,8 @@ namespace MSCloudNinjaGraphAPI.Controls
             appsGrid.EnableHeadersVisualStyles = false;
             appsGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             appsGrid.MultiSelect = true;
-            appsGrid.ReadOnly = false;
+            appsGrid.ReadOnly = false
+            ;
             appsGrid.AllowUserToAddRows = false;
             appsGrid.AllowUserToDeleteRows = false;
             appsGrid.AllowUserToResizeRows = false;
@@ -563,24 +564,33 @@ namespace MSCloudNinjaGraphAPI.Controls
                 {
                     string json = await File.ReadAllTextAsync(openFileDialog.FileName);
                     var backups = JsonSerializer.Deserialize<List<ApplicationBackup>>(json);
-                    
                     if (backups == null || !backups.Any())
                     {
                         MessageBox.Show("No applications found in backup file.", "Empty Backup",
                             MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         return;
                     }
+                    
+                    // Filter out any null applications
+                    var validBackups = backups.Where(b => b?.Application != null).ToList();
+                    if (!validBackups.Any())
+                    {
+                        MessageBox.Show("No valid applications found in backup file.", "Invalid Backup",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                    
+                    _backupApps = validBackups;  // Store only valid backups
 
-                    _backupApps = backups;  // Store the backup for later use
                     lblBackupStatus.Text = $"Backup loaded: {Path.GetFileName(openFileDialog.FileName)}";
                     lblBackupStatus.ForeColor = Color.RoyalBlue;
-                    UpdateStatus($"Loaded {backups.Count} applications from backup");
+                    UpdateStatus($"Loaded {validBackups.Count} applications from backup");
 
                     // Clear existing applications from the grid
                     appsGrid.Rows.Clear();
 
                     // Populate the grid with loaded applications
-                    foreach (var backup in backups)
+                    foreach (var backup in validBackups)
                     {
                         AddApplicationToGrid(backup.Application);
                     }
@@ -786,11 +796,7 @@ namespace MSCloudNinjaGraphAPI.Controls
                         Info = backup.Application.Info,
                         IsFallbackPublicClient = backup.Application.IsFallbackPublicClient,
                         IsDeviceOnlyAuthSupported = backup.Application.IsDeviceOnlyAuthSupported,
-                        IdentifierUris = backup.Application.IdentifierUris,
                         RequiredResourceAccess = backup.Application.RequiredResourceAccess,
-                        Web = backup.Application.Web,
-                        Spa = backup.Application.Spa,
-                        PublicClient = backup.Application.PublicClient,
                         OptionalClaims = backup.Application.OptionalClaims,
                         ParentalControlSettings = backup.Application.ParentalControlSettings,
                         Tags = backup.Application.Tags
@@ -808,6 +814,18 @@ namespace MSCloudNinjaGraphAPI.Controls
 
                     // Wait for app registration to propagate
                     await Task.Delay(2000);
+
+                    // Update redirect URIs in a separate call
+                    var updateApp = new Microsoft.Graph.Models.Application
+                    {
+                        Web = backup.Application.Web,
+                        Spa = backup.Application.Spa,
+                        PublicClient = backup.Application.PublicClient,
+                        IdentifierUris = backup.Application.IdentifierUris
+                    };
+                    
+                    await _graphClient.Applications[createdApp.Id]
+                        .PatchAsync(updateApp);
 
                     try
                     {
