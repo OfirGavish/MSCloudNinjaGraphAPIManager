@@ -49,6 +49,7 @@ namespace MSCloudNinjaGraphAPI
         }
 
         private GraphServiceClient _graphClient = null!;
+        private GraphServiceClient _intuneGraphClient = null!;
         private readonly string[] _scopes = new[] 
         { 
             "Policy.Read.All",
@@ -64,6 +65,8 @@ namespace MSCloudNinjaGraphAPI
             "DeviceManagementServiceConfig.ReadWrite.All"
         };
 
+        private ClientSecretCredential _appCredentials = null;
+
         private Panel authPanel = null!;
         private Button browserAuthButton = null!;
         private Button appRegAuthButton = null!;
@@ -77,6 +80,7 @@ namespace MSCloudNinjaGraphAPI
         private ModernButton btnConditionalAccess;
         private ModernButton btnEnterpriseApps;
         private ModernButton btnIntune;
+        private ModernButton btnLogout;
 
         public MainForm()
         {
@@ -237,6 +241,7 @@ namespace MSCloudNinjaGraphAPI
 
         private async void BrowserAuthButton_Click(object sender, EventArgs e)
         {
+            _appCredentials = null; // Clear app credentials when using browser auth
             try
             {
                 statusLabel.Text = "Opening browser for authentication...";
@@ -289,12 +294,12 @@ namespace MSCloudNinjaGraphAPI
                 statusLabel.Text = "Initializing app registration authentication...";
                 System.Windows.Forms.Application.DoEvents();
 
-                var credentials = new ClientSecretCredential(
+                _appCredentials = new ClientSecretCredential(
                     tenantIdTextBox.Text,
                     clientIdTextBox.Text,
                     clientSecretTextBox.Text);
 
-                var authProvider = new AzureIdentityAuthenticationProvider(credentials);
+                var authProvider = new AzureIdentityAuthenticationProvider(_appCredentials);
                 var requestAdapter = new HttpClientRequestAdapter(authProvider);
                 _graphClient = new GraphServiceClient(requestAdapter);
 
@@ -310,6 +315,7 @@ namespace MSCloudNinjaGraphAPI
             }
             catch (Exception ex)
             {
+                _appCredentials = null;
                 statusLabel.Text = $"Authentication failed: {ex.Message}";
                 MessageBox.Show($"Error during authentication: {ex.Message}", "Authentication Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
@@ -333,7 +339,6 @@ namespace MSCloudNinjaGraphAPI
                 bool hasAnyAccess = false;
                 bool hasConditionalAccess = false;
                 bool hasEnterpriseApps = false;
-                bool hasIntune = false;
 
                 // Try initializing each control separately
                 try
@@ -352,13 +357,7 @@ namespace MSCloudNinjaGraphAPI
                 }
                 catch (Exception) { }
 
-                try
-                {
-                    intuneControl = new IntuneControl(_graphClient);
-                    hasIntune = true;
-                    hasAnyAccess = true;
-                }
-                catch (Exception) { }
+                // Do NOT initialize IntuneControl here as it needs separate authentication
 
                 if (!hasAnyAccess)
                 {
@@ -366,7 +365,7 @@ namespace MSCloudNinjaGraphAPI
                 }
 
                 // Show warning if some controls are not available
-                if (!(hasConditionalAccess && hasEnterpriseApps && hasIntune))
+                if (!hasConditionalAccess || !hasEnterpriseApps)
                 {
                     MessageBox.Show("Only the parts your user or application has access to will be available", 
                         "Limited Access", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -377,8 +376,6 @@ namespace MSCloudNinjaGraphAPI
                     SwitchToControl(conditionalAccessControl);
                 else if (hasEnterpriseApps)
                     SwitchToControl(enterpriseAppsControl);
-                else if (hasIntune)
-                    SwitchToControl(intuneControl);
 
                 // Force a redraw
                 mainContent.Invalidate(true);
@@ -504,10 +501,24 @@ namespace MSCloudNinjaGraphAPI
                 FlatStyle = FlatStyle.Flat,
                 Location = new Point(720, 10)
             };
-            btnIntune.Click += (s, e) => btnIntuneManagement_Click(s, e);
+            btnIntune.Click += (s, e) => btnIntune_Click(s, e);
+
+            // Add logout button to the far right
+            btnLogout = new ModernButton
+            {
+                Text = "Logout",
+                Width = 100,
+                Height = 30,
+                BackColor = ThemeColors.HeaderBackground,
+                ForeColor = ThemeColors.TextLight,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(this.Width - 120, 10),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right // This will keep it on the right when window is resized
+            };
+            btnLogout.Click += (s, e) => btnLogout_Click(s, e);
 
             // Add controls to header
-            headerPanel.Controls.AddRange(new Control[] { logo, title, btnConditionalAccess, btnEnterpriseApps, btnIntune });
+            headerPanel.Controls.AddRange(new Control[] { logo, title, btnConditionalAccess, btnEnterpriseApps, btnIntune, btnLogout });
 
             // Setup main content panel
             mainContent.Dock = DockStyle.Fill;
@@ -590,16 +601,106 @@ namespace MSCloudNinjaGraphAPI
             SwitchToControl(enterpriseAppsControl);
         }
 
-        private void btnIntuneManagement_Click(object sender, EventArgs e)
+        private bool IsAppRegistrationAuth()
         {
-            if (!IsAuthenticated())
-            {
-                MessageBox.Show("Please authenticate first.", "Authentication Required",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
+            return _appCredentials != null;
+        }
 
-            SwitchToControl(intuneControl);
+        private void btnIntune_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (IsAppRegistrationAuth())
+                {
+                    // For app registration auth, reuse the existing graph client
+                    System.Diagnostics.Debug.WriteLine("Using App Registration authentication for Intune");
+                    _intuneGraphClient = _graphClient;
+                    ShowIntuneControl();
+                    return;
+                }
+                
+                if (_intuneGraphClient == null)
+                {
+                    var intuneAuthForm = new IntuneAuthForm();
+                    if (intuneAuthForm.ShowDialog() == DialogResult.OK)
+                    {
+                        _intuneGraphClient = intuneAuthForm.GraphClient;
+                        System.Diagnostics.Debug.WriteLine("Setting Intune Graph Client from auth form");
+                        
+                        // Verify the token
+                        var adapter = _intuneGraphClient.RequestAdapter as HttpClientRequestAdapter;
+                        if (adapter != null)
+                        {
+                            var authProvider = adapter.GetType().GetField("authProvider", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(adapter) as IAuthenticationProvider;
+                            if (authProvider != null)
+                            {
+                                var testRequest = new RequestInformation
+                                {
+                                    HttpMethod = Method.GET,
+                                    URI = new Uri("https://graph.microsoft.com/v1.0/deviceManagement/deviceConfigurations")
+                                };
+                                authProvider.AuthenticateRequestAsync(testRequest).Wait();
+                                var authHeader = testRequest.Headers["Authorization"].FirstOrDefault();
+                                System.Diagnostics.Debug.WriteLine($"Main form received token: {authHeader?.Substring(7, 50)}...");
+                            }
+                        }
+
+                        ShowIntuneControl();
+                    }
+                }
+                else
+                {
+                    ShowIntuneControl();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error initializing Intune: {ex.Message}", "Intune Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _intuneGraphClient = null;
+                intuneControl = null;
+            }
+        }
+
+        private void ShowIntuneControl()
+        {
+            try
+            {
+                if (intuneControl == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("Creating new IntuneControl with Graph Client");
+                    
+                    // Verify the token again before creating control
+                    var adapter = _intuneGraphClient.RequestAdapter as HttpClientRequestAdapter;
+                    if (adapter != null)
+                    {
+                        var authProvider = adapter.GetType().GetField("authProvider", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(adapter) as IAuthenticationProvider;
+                        if (authProvider != null)
+                        {
+                            var testRequest = new RequestInformation
+                            {
+                                HttpMethod = Method.GET,
+                                URI = new Uri("https://graph.microsoft.com/v1.0/deviceManagement/deviceConfigurations")
+                            };
+                            authProvider.AuthenticateRequestAsync(testRequest).Wait();
+                            var authHeader = testRequest.Headers["Authorization"].FirstOrDefault();
+                            System.Diagnostics.Debug.WriteLine($"Creating IntuneControl with token: {authHeader?.Substring(7, 50)}...");
+                        }
+                    }
+                    
+                    intuneControl = new IntuneControl(_intuneGraphClient);
+                    intuneControl.Dock = DockStyle.Fill;
+                }
+                
+                SwitchToControl(intuneControl);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error accessing Intune: {ex.Message}", "Intune Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _intuneGraphClient = null;
+                intuneControl = null;
+            }
         }
 
         private bool IsAuthenticated()
@@ -621,6 +722,56 @@ namespace MSCloudNinjaGraphAPI
             mainContent.Controls.Clear();
             control.Dock = DockStyle.Fill;
             mainContent.Controls.Add(control);
+        }
+
+        private void btnLogout_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Clear all clients and controls
+                _graphClient = null;
+                _intuneGraphClient = null;
+                _appCredentials = null;
+                
+                if (conditionalAccessControl != null)
+                {
+                    conditionalAccessControl.Dispose();
+                    conditionalAccessControl = null;
+                }
+                
+                if (enterpriseAppsControl != null)
+                {
+                    enterpriseAppsControl.Dispose();
+                    enterpriseAppsControl = null;
+                }
+                
+                if (intuneControl != null)
+                {
+                    intuneControl.Dispose();
+                    intuneControl = null;
+                }
+
+                // Clear the main content
+                mainContent.Controls.Clear();
+
+                // Reset text boxes
+                clientIdTextBox.Text = string.Empty;
+                tenantIdTextBox.Text = string.Empty;
+                clientSecretTextBox.Text = string.Empty;
+                
+                // Reset status label
+                statusLabel.Text = "Please choose an authentication method";
+
+                // Create and show new auth panel
+                SetupAuthPanel();
+
+                System.Diagnostics.Debug.WriteLine("Logged out successfully");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error during logout: {ex.Message}", "Logout Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 }
