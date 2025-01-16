@@ -16,7 +16,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCopyrightAttribute("MSCloudNinja")]
 [assembly: System.Reflection.AssemblyDescriptionAttribute("A tool for managing Microsoft Graph APIs")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.1.3")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+57b16c7e2fdfa09f19a6844d24916da149872e1d")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+335146cc95037f2ecc7dc8749a14639393d02609")]
 [assembly: System.Reflection.AssemblyProductAttribute("MSCloudNinja GraphAPI Manager")]
 [assembly: System.Reflection.AssemblyTitleAttribute("MSCloudNinja GraphAPI Manager")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

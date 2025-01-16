@@ -30,15 +30,11 @@
       "DocumentGroups": [
         {
           "DockedWidth": 200,
-          "SelectedChildIndex": 2,
+          "SelectedChildIndex": 1,
           "Children": [
             {
               "$type": "Bookmark",
               "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
-            },
-            {
-              "$type": "Bookmark",
-              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
             },
             {
               "$type": "Document",
@@ -48,7 +44,7 @@
               "RelativeDocumentMoniker": "MSCloudNinjaGraphAPI\\Controls\\EnterpriseAppsControl.cs",
               "ToolTip": "C:\\Users\\ofirga\\source\\repos\\MSCloudNinjaCAPTool\\MSCloudNinjaGraphAPI\\Controls\\EnterpriseAppsControl.cs",
               "RelativeToolTip": "MSCloudNinjaGraphAPI\\Controls\\EnterpriseAppsControl.cs",
-              "ViewState": "AgIAADYEAAAAAAAAAAApwEMEAAAMAAAAAAAAAA==",
+              "ViewState": "AgIAADYDAAAAAAAAAAAUwL0DAAAIAAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-01-16T08:30:41.92Z",
               "EditorCaption": ""
@@ -75,8 +71,7 @@
               "ToolTip": "C:\\Users\\ofirga\\source\\repos\\MSCloudNinjaCAPTool\\MSCloudNinjaGraphAPI\\MSCloudNinjaGraphAPI.csproj",
               "RelativeToolTip": "MSCloudNinjaGraphAPI\\MSCloudNinjaGraphAPI.csproj",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
-              "WhenOpened": "2025-01-15T09:36:01.095Z",
-              "EditorCaption": ""
+              "WhenOpened": "2025-01-15T09:36:01.095Z"
             },
             {
               "$type": "Document",

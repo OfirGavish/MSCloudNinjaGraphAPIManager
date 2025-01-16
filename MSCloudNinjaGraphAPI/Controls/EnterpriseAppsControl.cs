@@ -784,21 +784,16 @@ namespace MSCloudNinjaGraphAPI.Controls
             {
                 try
                 {
-                    // Create application registration first
+                    // Create application registration first with basic properties
                     var newApp = new Microsoft.Graph.Models.Application
                     {
                         DisplayName = backup.Application.DisplayName,
                         SignInAudience = backup.Application.SignInAudience,
                         Description = backup.Application.Description,
                         Notes = backup.Application.Notes,
-                        Api = backup.Application.Api,
                         AppRoles = backup.Application.AppRoles,
                         Info = backup.Application.Info,
-                        IsFallbackPublicClient = backup.Application.IsFallbackPublicClient,
-                        IsDeviceOnlyAuthSupported = backup.Application.IsDeviceOnlyAuthSupported,
                         RequiredResourceAccess = backup.Application.RequiredResourceAccess,
-                        OptionalClaims = backup.Application.OptionalClaims,
-                        ParentalControlSettings = backup.Application.ParentalControlSettings,
                         Tags = backup.Application.Tags
                     };
 
@@ -812,60 +807,151 @@ namespace MSCloudNinjaGraphAPI.Controls
                         continue;
                     }
 
-                    // Wait for app registration to propagate
-                    await Task.Delay(2000);
-
-                    // Update redirect URIs in a separate call
-                    var updateApp = new Microsoft.Graph.Models.Application
-                    {
-                        Web = backup.Application.Web,
-                        Spa = backup.Application.Spa,
-                        PublicClient = backup.Application.PublicClient,
-                        IdentifierUris = backup.Application.IdentifierUris
-                    };
-                    
-                    await _graphClient.Applications[createdApp.Id]
-                        .PatchAsync(updateApp);
+                    await Task.Delay(5000); // Wait for app registration to propagate
 
                     try
                     {
-                        // Create service principal using the app ID from the created application
-                        var servicePrincipal = new Microsoft.Graph.Models.ServicePrincipal
+                        // First update redirectUris only
+                        if (backup.Application.Web?.RedirectUris?.Count > 0)
                         {
-                            AppId = createdApp.AppId, // This is required
-                            // Optional properties from backup
-                            AccountEnabled = true, // Enable by default
-                            DisplayName = backup.ServicePrincipal?.DisplayName ?? backup.Application.DisplayName,
-                            Description = backup.ServicePrincipal?.Description ?? backup.Application.Description,
-                            Notes = backup.ServicePrincipal?.Notes,
-                            LoginUrl = backup.ServicePrincipal?.LoginUrl,
-                            AppRoleAssignmentRequired = backup.ServicePrincipal?.AppRoleAssignmentRequired ?? false,
-                            Tags = backup.ServicePrincipal?.Tags,
-                            ServicePrincipalType = backup.ServicePrincipal?.ServicePrincipalType ?? "Application", // Default to Application type
-                            PreferredTokenSigningKeyThumbprint = backup.ServicePrincipal?.PreferredTokenSigningKeyThumbprint,
-                            SamlSingleSignOnSettings = backup.ServicePrincipal?.SamlSingleSignOnSettings
-                        };
-
-                        var createdSp = await _graphClient.ServicePrincipals
-                            .PostAsync(servicePrincipal);
-
-                        if (createdSp != null)
-                        {
-                            successCount++;
-                            UpdateStatus($"Successfully restored {backup.Application.DisplayName}");
+                            await _graphClient.Applications[createdApp.Id]
+                                .PatchAsync(new Microsoft.Graph.Models.Application
+                                {
+                                    Web = new Microsoft.Graph.Models.WebApplication
+                                    {
+                                        RedirectUris = backup.Application.Web.RedirectUris
+                                    }
+                                });
+                            await Task.Delay(2000);
                         }
-                        else
+
+                        // Then update other web properties
+                        if (backup.Application.Web != null)
                         {
-                            errors.Add($"Failed to create service principal for {backup.Application.DisplayName} - no error but creation failed");
+                            await _graphClient.Applications[createdApp.Id]
+                                .PatchAsync(new Microsoft.Graph.Models.Application
+                                {
+                                    Web = new Microsoft.Graph.Models.WebApplication
+                                    {
+                                        HomePageUrl = backup.Application.Web.HomePageUrl,
+                                        LogoutUrl = backup.Application.Web.LogoutUrl,
+                                        ImplicitGrantSettings = backup.Application.Web.ImplicitGrantSettings,
+                                        RedirectUriSettings = backup.Application.Web.RedirectUriSettings
+                                    }
+                                });
+                            await Task.Delay(2000);
+                        }
+
+                        // Update SPA settings if they exist
+                        if (backup.Application.Spa != null)
+                        {
+                            await _graphClient.Applications[createdApp.Id]
+                                .PatchAsync(new Microsoft.Graph.Models.Application
+                                {
+                                    Spa = backup.Application.Spa
+                                });
+                            await Task.Delay(2000);
+                        }
+
+                        // Update PublicClient settings if they exist
+                        if (backup.Application.PublicClient != null)
+                        {
+                            await _graphClient.Applications[createdApp.Id]
+                                .PatchAsync(new Microsoft.Graph.Models.Application
+                                {
+                                    PublicClient = backup.Application.PublicClient
+                                });
+                            await Task.Delay(2000);
+                        }
+// Update the ApplicationId URI for SAML
+if (backup.Application.IdentifierUris?.Count > 0)
+{
+    try
+    {
+        var tenantId = (await _graphClient.Organization.GetAsync())?.Value?.FirstOrDefault()?.Id;
+        var appIdUri = $"api://{tenantId}/{createdApp.AppId}";
+        
+        await _graphClient.Applications[createdApp.Id]
+            .PatchAsync(new Microsoft.Graph.Models.Application
+            {
+                IdentifierUris = new List<string> { appIdUri }
+            });
+        
+        // Update the backup's IdentifierUris for consistency
+        backup.Application.IdentifierUris = new List<string> { appIdUri };
+    }
+    catch (Exception idUriEx)
+    {
+        errors.Add($"Warning: Failed to update IdentifierUris for {backup.Application.DisplayName}: {idUriEx.Message}");
+    }
+    await Task.Delay(2000);
+}
+
+                        try
+                        {
+                            // Create service principal using the app ID from the created application
+                            var servicePrincipal = new Microsoft.Graph.Models.ServicePrincipal
+                            {
+                               AppId = createdApp.AppId,
+    AccountEnabled = true,
+    DisplayName = backup.ServicePrincipal?.DisplayName ?? backup.Application.DisplayName,
+    Description = backup.ServicePrincipal?.Description ?? backup.Application.Description,
+    Notes = backup.ServicePrincipal?.Notes,
+    LoginUrl = backup.ServicePrincipal?.LoginUrl,
+    AppRoleAssignmentRequired = backup.ServicePrincipal?.AppRoleAssignmentRequired ?? false,
+    Tags = backup.ServicePrincipal?.Tags,
+    ServicePrincipalType = backup.ServicePrincipal?.ServicePrincipalType ?? "Application",
+    PreferredSingleSignOnMode = "saml",  // Add this
+    SamlSingleSignOnSettings = backup.ServicePrincipal?.SamlSingleSignOnSettings
+                            };
+
+                            var createdSp = await _graphClient.ServicePrincipals
+                                .PostAsync(servicePrincipal);
+
+                                if (createdSp != null)
+                                {
+                                    try 
+                                    {
+                                        // Add token signing certificate
+                                        await _graphClient.ServicePrincipals[createdSp.Id]
+                                            .AddTokenSigningCertificate
+                                            .PostAsync();
+                                        
+                                        await Task.Delay(2000);
+                                
+                                        successCount++;
+                                        UpdateStatus($"Successfully restored {backup.Application.DisplayName}");
+                                    }
+                                    catch (Exception certEx)
+                                    {
+                                        errors.Add($"Warning: Failed to add token signing certificate for {backup.Application.DisplayName}: {certEx.Message}");
+                                        // Still count as success since the app was created
+                                        successCount++;
+                                    }
+                                }
+
+                            if (createdSp != null)
+                            {
+                                successCount++;
+                                UpdateStatus($"Successfully restored {backup.Application.DisplayName}");
+                            }
+                            else
+                            {
+                                errors.Add($"Failed to create service principal for {backup.Application.DisplayName} - no error but creation failed");
+                            }
+                        }
+                        catch (Exception spEx)
+                        {
+                            errors.Add($"Failed to create service principal for {backup.Application.DisplayName}: {spEx.Message}");
+                            // Don't increment failure count as the app was created successfully
                         }
                     }
-                    catch (Exception spEx)
+                    catch (Exception ex)
                     {
-                        errors.Add($"Failed to create service principal for {backup.Application.DisplayName}: {spEx.Message}");
-                        // Don't increment failure count as the app was created successfully
+                        failureCount++;
+                        errors.Add($"Failed to restore {backup.Application.DisplayName}: {ex.Message}");
                     }
-                }
-                catch (Exception ex)
+                } catch (Exception ex)
                 {
                     failureCount++;
                     errors.Add($"Failed to restore {backup.Application.DisplayName}: {ex.Message}");
@@ -874,23 +960,24 @@ namespace MSCloudNinjaGraphAPI.Controls
 
             // Show final status with detailed error report
             var statusMessage = $"Restore operation completed.\nSuccessful: {successCount}\nFailed: {failureCount}";
-            if (errors.Any())
-            {
-                statusMessage += "\n\nErrors encountered:";
-                foreach (var error in errors)
+                if (errors.Any())
                 {
-                    statusMessage += $"\n- {error}";
+                    statusMessage += "\n\nErrors encountered:";
+                    foreach (var error in errors)
+                    {
+                        statusMessage += $"\n- {error}";
+                    }
+                    UpdateStatus(statusMessage, true);
                 }
-                UpdateStatus(statusMessage, true);
-            }
-            else
-            {
-                UpdateStatus(statusMessage);
-            }
+                else
+                {
+                    UpdateStatus(statusMessage);
+                }
 
-            // Refresh the grid to show current state
-            await LoadAppsAsync();
-        }
+                // Refresh the grid to show current state
+                await LoadAppsAsync();
+            }
+        
 
         private async Task<(Microsoft.Graph.Models.Application app, Microsoft.Graph.Models.ServicePrincipal sp)> GetApplicationAndServicePrincipal(string appId)
         {
