@@ -1,5 +1,6 @@
 using Microsoft.Graph;
 using MSCloudNinjaGraphAPI.Controls;
+using MSCloudNinjaGraphAPI.Services;
 using System;
 using System.Drawing;
 using System.Linq;
@@ -11,7 +12,6 @@ using Microsoft.Kiota.Authentication.Azure;
 using Microsoft.Kiota.Http.HttpClientLibrary;
 using Microsoft.Kiota.Abstractions;
 using Microsoft.Kiota.Abstractions.Authentication;
-using GraphApiClient;
 using System.Runtime.InteropServices;
 using Microsoft.Identity.Client;
 
@@ -95,9 +95,23 @@ namespace MSCloudNinjaGraphAPI
             // Create auth panel with modern styling
             authPanel = new Panel
             {
-                Dock = DockStyle.Fill,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 BackColor = ThemeColors.ContentBackground,
-                Padding = new Padding(30)
+                Padding = new Padding(30),
+                Anchor = AnchorStyles.None
+            };
+
+            this.Load += (s, e) =>
+            {
+                authPanel.Left = (this.ClientSize.Width - authPanel.Width) / 2;
+                authPanel.Top = (this.ClientSize.Height - authPanel.Height) / 2;
+            };
+
+            this.Resize += (s, e) =>
+            {
+                authPanel.Left = (this.ClientSize.Width - authPanel.Width) / 2;
+                authPanel.Top = (this.ClientSize.Height - authPanel.Height) / 2;
             };
 
             var authContainer = new Panel
@@ -351,7 +365,8 @@ namespace MSCloudNinjaGraphAPI
 
                 try 
                 {
-                    enterpriseAppsControl = new EnterpriseAppsControl(_graphClient);
+                    var enterpriseAppsService = new EnterpriseAppsService(_graphClient);
+                    enterpriseAppsControl = new EnterpriseAppsControl(_graphClient, enterpriseAppsService);
                     hasEnterpriseApps = true;
                     hasAnyAccess = true;
                 }

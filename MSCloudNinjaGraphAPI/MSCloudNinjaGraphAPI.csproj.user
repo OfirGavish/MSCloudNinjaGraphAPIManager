@@ -4,11 +4,32 @@
     <Compile Update="Controls\BaseGridControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Update="Controls\Components\EnterpriseAppsButtonPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Update="Controls\Components\EnterpriseAppsSearchPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Update="Controls\Components\EnterpriseAppsStatusPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Update="Controls\ConditionalAccessControl.cs">
       <SubType>UserControl</SubType>
     </Compile>
+    <Compile Update="Controls\EnterpriseAppsButtonPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Update="Controls\EnterpriseAppsControl.cs">
       <SubType>UserControl</SubType>
+    </Compile>
+    <Compile Update="Controls\EnterpriseAppsSearchPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Update="Controls\EnterpriseAppsStatusPanel.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Update="Controls\GridControls.cs">
+      <SubType>Component</SubType>
     </Compile>
     <Compile Update="Controls\IntuneControl.cs">
       <SubType>UserControl</SubType>
