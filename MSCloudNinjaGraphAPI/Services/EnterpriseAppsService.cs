@@ -94,6 +94,73 @@ namespace MSCloudNinjaGraphAPI.Services
             }
         }
 
+        private async Task<GraphApplication> GetApplicationByAppIdAsync(string appId)
+        {
+            try
+            {
+                var response = await _graphClient.Applications.GetAsync(config =>
+                {
+                    config.QueryParameters.Filter = $"appId eq '{appId}'";
+                    config.QueryParameters.Select = new string[]
+                    {
+                        "id",
+                        "appId",
+                        "displayName",
+                        "identifierUris",
+                        "api",
+                        "appRoles",
+                        "info",
+                        "keyCredentials",
+                        "passwordCredentials",
+                        "publicClient",
+                        "requiredResourceAccess",
+                        "signInAudience",
+                        "spa",
+                        "tags",
+                        "web"
+                    };
+                });
+
+                return response?.Value?.FirstOrDefault();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error getting application by AppId: {ex.Message}", ex);
+            }
+        }
+
+        private async Task<ServicePrincipal> GetServicePrincipalAsync(string appId)
+        {
+            try
+            {
+                var response = await _graphClient.ServicePrincipals.GetAsync(config =>
+                {
+                    config.QueryParameters.Filter = $"appId eq '{appId}'";
+                    config.QueryParameters.Select = new string[] 
+                    { 
+                        "id",
+                        "appId",
+                        "displayName",
+                        "appRoleAssignmentRequired",
+                        "loginUrl",
+                        "logoutUrl",
+                        "preferredTokenSigningKeyThumbprint",
+                        "samlSingleSignOnSettings",
+                        "servicePrincipalType",
+                        "tags",
+                        "keyCredentials",
+                        "passwordCredentials"
+                    };
+                });
+
+                return response?.Value?.FirstOrDefault();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error getting service principal: {ex.Message}", ex);
+            }
+        }
+
         public async Task SaveBackupAsync(List<GraphApplication> apps, string filePath)
         {
             try
@@ -101,6 +168,8 @@ namespace MSCloudNinjaGraphAPI.Services
                 var backups = new List<ApplicationBackup>();
                 foreach (var app in apps)
                 {
+                    await LogAsync($"Backing up application: {app.DisplayName}");
+                    
                     var backup = new ApplicationBackup
                     {
                         Application = app,
@@ -109,33 +178,64 @@ namespace MSCloudNinjaGraphAPI.Services
 
                     try
                     {
+                        // Get full application details including credentials
+                        var fullApp = await GetApplicationByAppIdAsync(app.AppId);
+                        if (fullApp != null)
+                        {
+                            backup.Application = fullApp;
+                        }
+
                         var servicePrincipal = await GetServicePrincipalAsync(app.AppId);
                         if (servicePrincipal != null)
                         {
                             backup.ServicePrincipal = servicePrincipal;
-                            backup.Secrets = await GetSecretsAsync(servicePrincipal.Id);
-                            backup.Certificates = await GetCertificatesAsync(servicePrincipal.Id);
                             
-                            // Get SCIM provisioning configuration
-                            backup.SyncJob = await GetSyncJobAsync(servicePrincipal.Id);
-                            backup.SyncTemplate = await GetSyncTemplateAsync(servicePrincipal.Id);
+                            // For SAML apps, log additional details
+                            if (servicePrincipal.Tags?.Contains("WindowsAzureActiveDirectoryCustomSingleSignOnApplication") == true)
+                            {
+                                await LogAsync($"Found SAML application: {app.DisplayName}");
+                                await LogAsync($"Login URL: {servicePrincipal.LoginUrl}");
+                                await LogAsync($"Token Signing Key Thumbprint: {servicePrincipal.PreferredTokenSigningKeyThumbprint}");
+                                
+                                if (servicePrincipal.KeyCredentials?.Any() == true)
+                                {
+                                    await LogAsync($"Found {servicePrincipal.KeyCredentials.Count} certificates");
+                                    foreach (var cert in servicePrincipal.KeyCredentials)
+                                    {
+                                        await LogAsync($"Certificate: {cert.DisplayName}, Type: {cert.Type}, Usage: {cert.Usage}");
+                                        await LogAsync($"Valid from {cert.StartDateTime} to {cert.EndDateTime}");
+                                    }
+                                }
+
+                                if (servicePrincipal.SamlSingleSignOnSettings != null)
+                                {
+                                    await LogAsync("Found SAML SSO settings");
+                                }
+                            }
                         }
                     }
                     catch (Exception ex)
                     {
-                        // Log the error but continue with the backup
+                        await LogAsync($"Error backing up app {app.DisplayName}: {ex.Message}");
                         System.Diagnostics.Debug.WriteLine($"Error backing up app {app.DisplayName}: {ex.Message}");
                     }
 
                     backups.Add(backup);
                 }
 
-                var options = new JsonSerializerOptions { WriteIndented = true };
+                var options = new JsonSerializerOptions 
+                { 
+                    WriteIndented = true,
+                    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+                };
+                
                 var json = JsonSerializer.Serialize(backups, options);
                 await File.WriteAllTextAsync(filePath, json);
+                await LogAsync($"Backup completed successfully. Saved to: {filePath}");
             }
             catch (Exception ex)
             {
+                await LogAsync($"Error saving backup: {ex.Message}");
                 throw new Exception($"Error saving backup: {ex.Message}", ex);
             }
         }
@@ -145,123 +245,76 @@ namespace MSCloudNinjaGraphAPI.Services
             try
             {
                 await LogAsync($"Starting restore process for application: {backup.Application.DisplayName}");
+                await LogAsync("Step 1: Creating Application Registration");
 
-                // Step 1: Create the basic application registration
                 var app = backup.Application;
-                await LogAsync("Step 1: Creating basic application registration");
-                var newApp = await _graphClient.Applications.PostAsync(new GraphApplication
+                var newApp = new GraphApplication
                 {
                     DisplayName = app.DisplayName,
-                    Description = app.Description,
-                    Notes = app.Notes,
-                    SignInAudience = app.SignInAudience ?? "AzureADMyOrg"
-                });
-
-                if (newApp == null)
-                {
-                    await LogAsync("ERROR: Failed to create application");
-                    throw new Exception($"Failed to create application {app.DisplayName}");
-                }
-
-                await LogAsync($"Created application with ID: {newApp.Id} and AppId: {newApp.AppId}");
-                await Task.Delay(5000); // Increased delay
-
-                // Step 2: Update the application with additional properties
-                await LogAsync("Step 2: Updating application with additional properties");
-                var updateApp = new GraphApplication
-                {
-                    Api = app.Api != null ? new ApiApplication
-                    {
-                        AcceptMappedClaims = app.Api.AcceptMappedClaims ?? false,
-                        RequestedAccessTokenVersion = app.Api.RequestedAccessTokenVersion ?? 2,
-                        Oauth2PermissionScopes = app.Api.Oauth2PermissionScopes?.Select(s => new PermissionScope
-                        {
-                            Id = s.Id,
-                            AdminConsentDescription = s.AdminConsentDescription,
-                            AdminConsentDisplayName = s.AdminConsentDisplayName,
-                            IsEnabled = s.IsEnabled ?? true,
-                            Type = s.Type,
-                            UserConsentDescription = s.UserConsentDescription,
-                            UserConsentDisplayName = s.UserConsentDisplayName,
-                            Value = s.Value
-                        }).ToList() ?? new List<PermissionScope>(),
-                        PreAuthorizedApplications = app.Api.PreAuthorizedApplications?.Select(p => new PreAuthorizedApplication
-                        {
-                            AppId = p.AppId,
-                            DelegatedPermissionIds = p.DelegatedPermissionIds?.ToList() ?? new List<string>()
-                        }).ToList() ?? new List<PreAuthorizedApplication>()
-                    } : null,
-                    Web = app.Web != null ? new WebApplication
-                    {
-                        HomePageUrl = app.Web.HomePageUrl,
-                        LogoutUrl = app.Web.LogoutUrl,
-                        RedirectUris = app.Web.RedirectUris?.ToList() ?? new List<string>()
-                    } : null,
-                    Spa = app.Spa != null ? new SpaApplication
-                    {
-                        RedirectUris = app.Spa.RedirectUris?.ToList() ?? new List<string>()
-                    } : null,
-                    PublicClient = app.PublicClient != null ? new PublicClientApplication
-                    {
-                        RedirectUris = app.PublicClient.RedirectUris?.ToList() ?? new List<string>()
-                    } : null
+                    SignInAudience = app.SignInAudience,
+                    Api = app.Api,
+                    AppRoles = app.AppRoles,
+                    IdentifierUris = app.IdentifierUris,
+                    Info = app.Info,
+                    RequiredResourceAccess = app.RequiredResourceAccess,
+                    Web = app.Web,
+                    Tags = app.Tags
                 };
 
-                await _graphClient.Applications[newApp.Id].PatchAsync(updateApp);
-                await LogAsync("Updated application with additional properties");
-                await Task.Delay(5000); // Increased delay
+                await _graphClient.Applications.PostAsync(newApp);
+                await LogAsync($"Created application registration: {newApp.DisplayName}");
+                await Task.Delay(5000); // Wait for app registration to propagate
 
-                // Step 3: Create the enterprise application (service principal)
-                await LogAsync("Step 3: Creating enterprise application (service principal)");
-                
-                try
+                // Step 2: Get the new application to get its ID
+                var createdApp = await GetApplicationByAppIdAsync(newApp.AppId);
+                if (createdApp == null)
                 {
-                    var sp = backup.ServicePrincipal;
-                    var newSp = await _graphClient.ServicePrincipals.PostAsync(new ServicePrincipal
-                    {
-                        AppId = newApp.AppId,
-                        AccountEnabled = true,
-                        DisplayName = sp?.DisplayName ?? app.DisplayName,
-                        Description = sp?.Description ?? app.Description,
-                        Notes = sp?.Notes,
-                        ServicePrincipalType = "Application",
-                        PreferredSingleSignOnMode = sp?.PreferredSingleSignOnMode ?? "saml",
-                        AppRoleAssignmentRequired = sp?.AppRoleAssignmentRequired ?? false,
-                        Homepage = sp?.Homepage ?? app.Web?.HomePageUrl,
-                        LogoutUrl = sp?.LogoutUrl ?? app.Web?.LogoutUrl,
-                        ReplyUrls = (sp?.ReplyUrls?.ToList() ?? app.Web?.RedirectUris?.ToList() ?? new List<string>()),
-                        Tags = sp?.Tags?.ToList() ?? app.Tags?.ToList() ?? new List<string>()
-                    });
+                    throw new Exception("Could not find newly created application");
+                }
 
-                    if (newSp != null)
-                    {
-                        await LogAsync($"Created service principal with ID: {newSp.Id}");
-                        await Task.Delay(5000); // Increased delay
+                await LogAsync("Step 2: Creating Service Principal");
+                var sp = backup.ServicePrincipal;
+                var newSp = await _graphClient.ServicePrincipals.PostAsync(new ServicePrincipal
+                {
+                    AppId = newApp.AppId,
+                    AppRoleAssignmentRequired = sp.AppRoleAssignmentRequired,
+                    DisplayName = sp.DisplayName,
+                    LoginUrl = sp.LoginUrl,
+                    ServicePrincipalType = sp.ServicePrincipalType,
+                    Tags = sp.Tags,
+                    PreferredTokenSigningKeyThumbprint = sp.PreferredTokenSigningKeyThumbprint
+                });
 
-                        // Step 4: Restore secrets
-                        if (backup.Secrets?.Any() == true)
+                if (newSp != null)
+                {
+                    await LogAsync($"Created service principal with ID: {newSp.Id}");
+                    await Task.Delay(5000);
+
+                    // Step 3: Update App Registration's web configuration
+                    await LogAsync("Step 3: Updating App Registration web configuration");
+                    if (app.Web?.RedirectUris?.Any() == true)
+                    {
+                        var updateApp = new GraphApplication
                         {
-                            await LogAsync("Step 4: Restoring secrets");
-                            foreach (var secret in backup.Secrets)
-                            {
-                                await _graphClient.ServicePrincipals[newSp.Id].AddPassword.PostAsync(new AddPasswordPostRequestBody
-                                {
-                                    PasswordCredential = new PasswordCredential
-                                    {
-                                        DisplayName = secret.DisplayName,
-                                        EndDateTime = secret.EndDateTime
-                                    }
-                                });
-                                await LogAsync($"Added secret: {secret.DisplayName}");
-                                await Task.Delay(2000);
-                            }
+                            Web = app.Web,
+                            IdentifierUris = app.IdentifierUris
+                        };
+                        await _graphClient.Applications[createdApp.Id].PatchAsync(updateApp);
+                        await LogAsync($"Updated App Registration with {app.Web.RedirectUris.Count} Redirect URIs");
+                        foreach (var url in app.Web.RedirectUris)
+                        {
+                            await LogAsync($"Added Redirect URI: {url}");
                         }
+                        await Task.Delay(2000);
+                    }
 
-                        // Step 5: Restore certificates
-                        if (backup.Certificates?.Any() == true)
+                    // Step 4: Add certificates
+                    if (sp.KeyCredentials?.Any() == true)
+                    {
+                        await LogAsync("Step 4: Adding certificates");
+                        foreach (var cert in sp.KeyCredentials)
                         {
-                            await LogAsync("Step 5: Restoring certificates");
-                            foreach (var cert in backup.Certificates)
+                            try
                             {
                                 var keyCredential = new KeyCredential
                                 {
@@ -279,61 +332,70 @@ namespace MSCloudNinjaGraphAPI.Services
                                     KeyCredential = keyCredential,
                                     Proof = "proof"
                                 });
-                                await LogAsync($"Added certificate: {cert.DisplayName}");
+                                await LogAsync($"Added certificate: {keyCredential.DisplayName}");
+                                await LogAsync($"Certificate type: {keyCredential.Type}, usage: {keyCredential.Usage}");
+                                await LogAsync($"Valid from {keyCredential.StartDateTime} to {keyCredential.EndDateTime}");
                                 await Task.Delay(2000);
                             }
-                        }
-
-                        // Step 6: Restore SCIM provisioning
-                        if (backup.SyncTemplate != null)
-                        {
-                            await LogAsync("Step 6: Restoring SCIM provisioning");
-                            await _graphClient.ServicePrincipals[newSp.Id].Synchronization.Templates.PostAsync(backup.SyncTemplate);
-                            await Task.Delay(2000);
-                        }
-
-                        if (backup.SyncJob != null)
-                        {
-                            await _graphClient.ServicePrincipals[newSp.Id].Synchronization.Jobs.PostAsync(backup.SyncJob);
-                            await LogAsync("Added SCIM sync job");
+                            catch (Exception certEx)
+                            {
+                                await LogAsync($"Error adding certificate {cert.DisplayName}: {certEx.Message}");
+                            }
                         }
                     }
-                    else
+
+                    // Step 5: Add password credentials if any
+                    if (sp.PasswordCredentials?.Any() == true)
                     {
-                        await LogAsync("ERROR: Failed to create service principal");
+                        await LogAsync("Step 5: Adding password credentials");
+                        foreach (var cred in sp.PasswordCredentials)
+                        {
+                            try
+                            {
+                                var passwordCredential = new PasswordCredential
+                                {
+                                    DisplayName = cred.DisplayName,
+                                    StartDateTime = cred.StartDateTime,
+                                    EndDateTime = cred.EndDateTime,
+                                    CustomKeyIdentifier = cred.CustomKeyIdentifier
+                                };
+
+                                await _graphClient.ServicePrincipals[newSp.Id].AddPassword.PostAsync(new AddPasswordPostRequestBody
+                                {
+                                    PasswordCredential = passwordCredential
+                                });
+                                await LogAsync($"Added password credential: {passwordCredential.DisplayName}");
+                                await Task.Delay(2000);
+                            }
+                            catch (Exception credEx)
+                            {
+                                await LogAsync($"Error adding password credential {cred.DisplayName}: {credEx.Message}");
+                            }
+                        }
                     }
-                }
-                catch (Exception spEx)
-                {
-                    await LogAsync($"ERROR creating service principal: {spEx.Message}");
-                    await LogAsync($"Stack trace: {spEx.StackTrace}");
-                    throw;
-                }
 
-                await LogAsync($"Completed restore process for application: {app.DisplayName}");
+                    // Step 6: Update SAML SSO settings
+                    if (sp.Tags?.Contains("WindowsAzureActiveDirectoryCustomSingleSignOnApplication") == true)
+                    {
+                        await LogAsync("Step 6: Updating SAML SSO settings");
+                        var samlSettings = new ServicePrincipal
+                        {
+                            PreferredTokenSigningKeyThumbprint = sp.PreferredTokenSigningKeyThumbprint,
+                            LoginUrl = sp.LoginUrl,
+                            SamlSingleSignOnSettings = sp.SamlSingleSignOnSettings
+                        };
+                        await _graphClient.ServicePrincipals[newSp.Id].PatchAsync(samlSettings);
+                        await LogAsync("Updated SAML SSO settings");
+                        await Task.Delay(2000);
+                    }
+
+                    await LogAsync($"Successfully restored application: {app.DisplayName}");
+                }
             }
             catch (Exception ex)
             {
-                await LogAsync($"ERROR in restore process: {ex.Message}");
-                await LogAsync($"Stack trace: {ex.StackTrace}");
+                await LogAsync($"Error restoring application {backup.Application.DisplayName}: {ex.Message}");
                 throw new Exception($"Error restoring application {backup.Application.DisplayName}: {ex.Message}", ex);
-            }
-        }
-
-        private async Task<GraphApplication> GetApplicationByAppIdAsync(string appId)
-        {
-            try
-            {
-                var response = await _graphClient.Applications.GetAsync(config =>
-                {
-                    config.QueryParameters.Filter = $"appId eq '{appId}'";
-                });
-
-                return response?.Value?.FirstOrDefault();
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error getting application by AppId: {ex.Message}", ex);
             }
         }
 
@@ -361,37 +423,17 @@ namespace MSCloudNinjaGraphAPI.Services
             }
         }
 
-        private async Task<ServicePrincipal> GetServicePrincipalAsync(string appId)
-        {
-            try
-            {
-                var response = await _graphClient.ServicePrincipals.GetAsync(config =>
-                {
-                    config.QueryParameters.Filter = $"appId eq '{appId}'";
-                });
-
-                return response?.Value?.FirstOrDefault();
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error getting service principal: {ex.Message}", ex);
-            }
-        }
-
         private async Task<List<PasswordCredential>> GetSecretsAsync(string servicePrincipalId)
         {
             try
             {
-                var response = await _graphClient.ServicePrincipals[servicePrincipalId].GetAsync(config =>
-                {
-                    config.QueryParameters.Select = new[] { "passwordCredentials" };
-                });
-
-                return response?.PasswordCredentials?.ToList() ?? new List<PasswordCredential>();
+                var response = await _graphClient.ServicePrincipals[servicePrincipalId].AddPassword.PostAsync(new AddPasswordPostRequestBody());
+                return response != null ? new List<PasswordCredential> { response } : new List<PasswordCredential>();
             }
             catch (Exception ex)
             {
-                throw new Exception($"Error getting secrets: {ex.Message}", ex);
+                System.Diagnostics.Debug.WriteLine($"Error getting secrets: {ex.Message}");
+                return new List<PasswordCredential>();
             }
         }
 
@@ -399,16 +441,17 @@ namespace MSCloudNinjaGraphAPI.Services
         {
             try
             {
-                var response = await _graphClient.ServicePrincipals[servicePrincipalId].GetAsync(config =>
+                var servicePrincipal = await _graphClient.ServicePrincipals[servicePrincipalId].GetAsync(config =>
                 {
-                    config.QueryParameters.Select = new[] { "keyCredentials" };
+                    config.QueryParameters.Select = new string[] { "keyCredentials" };
                 });
 
-                return response?.KeyCredentials?.ToList() ?? new List<KeyCredential>();
+                return servicePrincipal?.KeyCredentials?.ToList() ?? new List<KeyCredential>();
             }
             catch (Exception ex)
             {
-                throw new Exception($"Error getting certificates: {ex.Message}", ex);
+                System.Diagnostics.Debug.WriteLine($"Error getting certificates: {ex.Message}");
+                return new List<KeyCredential>();
             }
         }
 

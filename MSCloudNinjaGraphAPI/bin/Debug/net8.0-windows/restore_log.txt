@@ -1,0 +1,44 @@
+2025-01-18 00:34:35.446 - Starting restore process for application: ESI - Bitwarden SSO
+2025-01-18 00:34:35.458 - Step 1: Creating basic application registration
+2025-01-18 00:34:35.894 - Created application with ID: af8b1996-c93f-496a-bc80-88323213d1a2 and AppId: f0cd8351-2f50-41e4-92de-ee95a1673f95
+2025-01-18 00:34:40.909 - Step 2: Updating application with additional properties
+2025-01-18 00:34:41.267 - Updated application with additional properties
+2025-01-18 00:34:46.271 - Step 3: Creating enterprise application (service principal)
+2025-01-18 00:34:46.764 - Created service principal with ID: 36c7e003-fb71-4007-b84e-5a5df3f420b1
+2025-01-18 00:34:51.776 - Completed restore process for application: ESI - Bitwarden SSO
+2025-01-18 01:00:56.871 - Starting restore process for application: ESI - Bitwarden SSO
+2025-01-18 01:00:56.875 - Step 1: Creating basic application registration
+2025-01-18 01:00:57.309 - Created application with ID: 758429b6-0682-4398-9686-bc0d18d5baac and AppId: 1cc9a8d0-8a46-4bfe-b562-8b57a41bc4d9
+2025-01-18 01:01:02.312 - Step 2: Updating application with additional properties
+2025-01-18 01:01:02.699 - Updated application with additional properties
+2025-01-18 01:01:07.707 - Step 3: Creating enterprise application (service principal)
+2025-01-18 01:01:08.153 - Created service principal with ID: cfd56a76-309f-4337-9415-c823cc079223
+2025-01-18 01:01:13.165 - Updating SAML SSO settings
+2025-01-18 01:01:13.167 - Completed restore process for application: ESI - Bitwarden SSO
+2025-01-18 01:09:04.295 - Starting restore process for application: ESI - Bitwarden SSO
+2025-01-18 01:09:04.300 - Step 1: Creating basic application registration
+2025-01-18 01:09:04.559 - Created application with ID: a76e7b61-6fa5-4d91-84ca-24a5e8cde937 and AppId: 4ee1d1b8-9fc9-4cd1-83a7-37230828c2f2
+2025-01-18 01:09:09.573 - Step 2: Creating enterprise application with SAML settings
+2025-01-18 01:09:09.784 - Created service principal with ID: 35339617-26a4-47a4-ae26-445247b37045
+2025-01-18 01:09:14.794 - Step 3: Updating App Registration redirectURIs for SAML
+2025-01-18 01:09:14.795 - Step 4: Configuring SAML properties
+2025-01-18 01:09:14.951 - Updated SAML SSO settings
+2025-01-18 01:09:16.956 - Completed restore process for application: ESI - Bitwarden SSO
+2025-01-18 01:22:16.775 - Starting restore process for application: ESI - Bitwarden SSO
+2025-01-18 01:22:16.779 - Step 1: Creating basic application registration
+2025-01-18 01:22:17.711 - Created application with ID: 4323a0ea-9e90-4173-bd78-9c409dd20559 and AppId: 193fafe9-8039-46fb-ba5c-09adaa7aa8cc
+2025-01-18 01:22:22.716 - Step 2: Creating enterprise application with SAML settings
+2025-01-18 01:22:23.140 - Created service principal with ID: 6c88f33b-c6f3-4a77-8623-cce4f742d937
+2025-01-18 01:22:28.144 - Step 3: Updating App Registration for SAML
+2025-01-18 01:22:28.565 - Updated App Registration for SAML
+2025-01-18 01:22:30.580 - Step 4: Ensuring SAML configuration
+2025-01-18 01:22:30.925 - Updated SAML SSO settings
+2025-01-18 01:22:32.940 - Completed restore process for application: ESI - Bitwarden SSO
+2025-01-18 01:35:58.988 - Backing up SAML application: MSCloudNinja - TestENT
+2025-01-18 01:35:58.990 - SAML Reply URLs: https://sso.bitwarden.eu/saml2/a0751154-6cd9-47cd-bf49-b265009da7f4/Acs
+2025-01-18 01:35:59.312 - Found 2 certificates
+2025-01-18 01:35:59.314 - Certificate: CN=Microsoft Azure Federated SSO Certificate, Valid from 1/17/2025 11:33:08 PM +00:00 to 1/17/2028 11:33:08 PM +00:00
+2025-01-18 01:35:59.315 - Certificate: CN=Microsoft Azure Federated SSO Certificate, Valid from 1/17/2025 11:33:08 PM +00:00 to 1/17/2028 11:33:08 PM +00:00
+2025-01-18 01:35:59.316 - Found SAML SSO settings
+2025-01-18 01:35:59.317 - Relay State: 
+2025-01-18 01:36:03.634 - Backup completed successfully. Saved to: C:\Temp\appsbackup\mscloudTestENT.json

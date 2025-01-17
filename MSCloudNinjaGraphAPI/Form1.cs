@@ -120,8 +120,20 @@ namespace MSCloudNinjaGraphAPI
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 BackColor = ThemeColors.GridBackground,
                 Padding = new Padding(30),
-                Location = new Point(0, 50)
+                Location = new Point(0, 50),
+                Dock = DockStyle.Fill
             };
+
+            var centerPanel = new TableLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 1,
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0),
+                BackColor = ThemeColors.GridBackground
+            };
+            centerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
 
             var authLabel = new Label
             {
@@ -129,14 +141,17 @@ namespace MSCloudNinjaGraphAPI
                 Font = new Font("Segoe UI Light", 24),
                 ForeColor = ThemeColors.TextLight,
                 AutoSize = true,
-                Margin = new Padding(0, 0, 0, 20)
+                Margin = new Padding(0, 0, 0, 20),
+                Anchor = AnchorStyles.None,
+                TextAlign = ContentAlignment.MiddleCenter
             };
 
             browserAuthButton = new ModernButton
             {
                 Text = "User Authentication",
                 Width = 400,
-                Margin = new Padding(0, 10, 0, 10)
+                Margin = new Padding(0, 10, 0, 10),
+                Anchor = AnchorStyles.None
             };
             browserAuthButton.Click += BrowserAuthButton_Click;
 
@@ -144,7 +159,8 @@ namespace MSCloudNinjaGraphAPI
             {
                 Text = "App Registration Authentication",
                 Width = 400,
-                Margin = new Padding(0, 10, 0, 20)
+                Margin = new Padding(0, 10, 0, 20),
+                Anchor = AnchorStyles.None
             };
             appRegAuthButton.Click += AppRegAuthButton_Click;
 
@@ -155,7 +171,9 @@ namespace MSCloudNinjaGraphAPI
                 Font = new Font("Segoe UI", 10),
                 ForeColor = ThemeColors.TextLight,
                 AutoSize = true,
-                Margin = new Padding(0, 10, 0, 5)
+                Margin = new Padding(0, 10, 0, 5),
+                Anchor = AnchorStyles.None,
+                TextAlign = ContentAlignment.MiddleCenter
             };
 
             clientIdTextBox = new TextBox
@@ -164,7 +182,8 @@ namespace MSCloudNinjaGraphAPI
                 Font = new Font("Segoe UI", 10),
                 BackColor = ThemeColors.GridBackground,
                 ForeColor = ThemeColors.TextLight,
-                BorderStyle = BorderStyle.FixedSingle
+                BorderStyle = BorderStyle.FixedSingle,
+                Anchor = AnchorStyles.None
             };
 
             var tenantIdLabel = new Label
@@ -173,7 +192,9 @@ namespace MSCloudNinjaGraphAPI
                 Font = new Font("Segoe UI", 10),
                 ForeColor = ThemeColors.TextLight,
                 AutoSize = true,
-                Margin = new Padding(0, 10, 0, 5)
+                Margin = new Padding(0, 10, 0, 5),
+                Anchor = AnchorStyles.None,
+                TextAlign = ContentAlignment.MiddleCenter
             };
 
             tenantIdTextBox = new TextBox
@@ -182,7 +203,8 @@ namespace MSCloudNinjaGraphAPI
                 Font = new Font("Segoe UI", 10),
                 BackColor = ThemeColors.GridBackground,
                 ForeColor = ThemeColors.TextLight,
-                BorderStyle = BorderStyle.FixedSingle
+                BorderStyle = BorderStyle.FixedSingle,
+                Anchor = AnchorStyles.None
             };
 
             var clientSecretLabel = new Label
@@ -191,7 +213,9 @@ namespace MSCloudNinjaGraphAPI
                 Font = new Font("Segoe UI", 10),
                 ForeColor = ThemeColors.TextLight,
                 AutoSize = true,
-                Margin = new Padding(0, 10, 0, 5)
+                Margin = new Padding(0, 10, 0, 5),
+                Anchor = AnchorStyles.None,
+                TextAlign = ContentAlignment.MiddleCenter
             };
 
             clientSecretTextBox = new TextBox
@@ -201,51 +225,37 @@ namespace MSCloudNinjaGraphAPI
                 BackColor = ThemeColors.GridBackground,
                 ForeColor = ThemeColors.TextLight,
                 BorderStyle = BorderStyle.FixedSingle,
-                PasswordChar = '•'
+                Anchor = AnchorStyles.None
             };
 
+            // Add controls to the center panel
+            centerPanel.Controls.Add(authLabel);
+            centerPanel.Controls.Add(browserAuthButton);
+            centerPanel.Controls.Add(appRegAuthButton);
+            centerPanel.Controls.Add(clientIdLabel);
+            centerPanel.Controls.Add(clientIdTextBox);
+            centerPanel.Controls.Add(tenantIdLabel);
+            centerPanel.Controls.Add(tenantIdTextBox);
+            centerPanel.Controls.Add(clientSecretLabel);
+            centerPanel.Controls.Add(clientSecretTextBox);
+
+            // Add the center panel to the auth container
+            authContainer.Controls.Add(centerPanel);
+
+            // Add status label at the bottom
             statusLabel = new Label
             {
                 Text = "Please choose an authentication method",
                 Font = new Font("Segoe UI", 10),
-                ForeColor = ThemeColors.TextDark,
+                ForeColor = ThemeColors.TextLight,
                 AutoSize = true,
-                Margin = new Padding(0, 20, 0, 0)
+                Margin = new Padding(0, 20, 0, 0),
+                Anchor = AnchorStyles.None,
+                TextAlign = ContentAlignment.MiddleCenter
             };
+            centerPanel.Controls.Add(statusLabel);
 
-            // Create FlowLayoutPanel for vertical stacking
-            var flowLayout = new FlowLayoutPanel
-            {
-                FlowDirection = FlowDirection.TopDown,
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                WrapContents = false
-            };
-
-            // Add controls to flow layout
-            flowLayout.Controls.AddRange(new Control[] 
-            { 
-                authLabel,
-                browserAuthButton,
-                appRegAuthButton,
-                clientIdLabel,
-                clientIdTextBox,
-                tenantIdLabel,
-                tenantIdTextBox,
-                clientSecretLabel,
-                clientSecretTextBox,
-                statusLabel
-            });
-
-            // Add flow layout to auth container
-            authContainer.Controls.Add(flowLayout);
-            
-            // Center the auth container
-            authContainer.Location = new Point(
-                (authPanel.ClientSize.Width - authContainer.Width) / 2,
-                (authPanel.ClientSize.Height - authContainer.Height) / 2);
-
-            // Add auth container to auth panel
+            // Add the auth container to the auth panel
             authPanel.Controls.Add(authContainer);
 
             // Initially show only the auth panel
@@ -444,7 +454,7 @@ namespace MSCloudNinjaGraphAPI
             headerPanel.Dock = DockStyle.Top;
             headerPanel.Height = 50;
             headerPanel.BackColor = ThemeColors.HeaderBackground;
-            headerPanel.Padding = new Padding(10, 5, 10, 5);
+            headerPanel.Padding = new Padding(10);
 
             // Add logo to header
             var logo = new PictureBox
