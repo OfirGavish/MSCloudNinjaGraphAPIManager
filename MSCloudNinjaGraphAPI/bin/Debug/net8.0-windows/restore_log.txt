@@ -42,3 +42,88 @@
 2025-01-18 01:35:59.316 - Found SAML SSO settings
 2025-01-18 01:35:59.317 - Relay State: 
 2025-01-18 01:36:03.634 - Backup completed successfully. Saved to: C:\Temp\appsbackup\mscloudTestENT.json
+2025-01-18 01:52:01.149 - Backing up application: MSCloudNinja - TestENT
+2025-01-18 01:52:02.315 - Found SAML application: MSCloudNinja - TestENT
+2025-01-18 01:52:02.317 - Login URL: https://vault.bitwarden.eu/#/sso
+2025-01-18 01:52:02.318 - Token Signing Key Thumbprint: 9809B6E70F8BF14227B62DFB0F745371164D4491
+2025-01-18 01:52:02.319 - Found 2 certificates
+2025-01-18 01:52:02.320 - Certificate: CN=Microsoft Azure Federated SSO Certificate, Type: AsymmetricX509Cert, Usage: Verify
+2025-01-18 01:52:02.321 - Valid from 1/17/2025 11:33:08 PM +00:00 to 1/17/2028 11:33:08 PM +00:00
+2025-01-18 01:52:02.322 - Certificate: CN=Microsoft Azure Federated SSO Certificate, Type: AsymmetricX509Cert, Usage: Sign
+2025-01-18 01:52:02.323 - Valid from 1/17/2025 11:33:08 PM +00:00 to 1/17/2028 11:33:08 PM +00:00
+2025-01-18 01:52:02.324 - Found SAML SSO settings
+2025-01-18 01:52:02.444 - Backup completed successfully. Saved to: C:\Temp\appsbackup\mscloudTestENT.json
+2025-01-18 01:53:45.595 - Starting restore process for application: MSCloudNinja - TestENT
+2025-01-18 01:53:45.597 - Step 1: Creating Application Registration
+2025-01-18 01:53:45.975 - Error restoring application MSCloudNinja - TestENT: A null value was found for the property named 'identifierUris', which has the expected type 'Collection(Edm.String)[Nullable=False]'. The expected type 'Collection(Edm.String)[Nullable=False]' does not allow null values.
+2025-01-18 02:21:44.095 - Loading backup from: C:\Temp\appsbackup\mscloudTestENT.json
+2025-01-18 02:21:44.216 - Loaded backup for app: MSCloudNinja - TestENT
+2025-01-18 02:21:44.218 - IdentifierUris count: 1
+2025-01-18 02:21:44.221 - Found IdentifierUri: https://sso.bitwarden.eu/saml2/a0751154-6cd9-47cd-bf49-b265009da7f4
+2025-01-18 02:22:02.104 - Loading backup from: C:\Temp\appsbackup\mscloudTestENT.json
+2025-01-18 02:22:02.122 - Loaded backup for app: MSCloudNinja - TestENT
+2025-01-18 02:22:02.123 - IdentifierUris count: 1
+2025-01-18 02:22:02.125 - Found IdentifierUri: https://sso.bitwarden.eu/saml2/a0751154-6cd9-47cd-bf49-b265009da7f4
+2025-01-18 02:22:11.076 - Starting restore process for application: MSCloudNinja - TestENT
+2025-01-18 02:22:11.078 - Creating Enterprise Application using SAML SSO template
+2025-01-18 02:25:40.134 - Starting restore process for application: MSCloudNinja - TestENT
+2025-01-18 02:25:40.147 - Creating Enterprise Application using SAML SSO template
+2025-01-18 02:28:46.260 - Loading backup from: C:\Temp\appsbackup\mscloudTestENT.json
+2025-01-18 02:28:46.391 - Loaded backup for app: MSCloudNinja - TestENT
+2025-01-18 02:28:46.392 - IdentifierUris count: 1
+2025-01-18 02:28:46.394 - Found IdentifierUri: https://sso.bitwarden.eu/saml2/a0751154-6cd9-47cd-bf49-b265009da7f4
+2025-01-18 02:28:52.805 - Error restoring application MSCloudNinja - TestENT: Backup does not contain a service principal (Parameter 'backup')
+2025-01-18 02:33:58.810 - Loading backup from: C:\Temp\appsbackup\mscloudTestENT.json
+2025-01-18 02:33:58.934 - Loaded backup for app: MSCloudNinja - TestENT
+2025-01-18 02:33:58.936 - Found Service Principal: MSCloudNinja - TestENT
+2025-01-18 02:33:58.937 - Service Principal Type: Application
+2025-01-18 02:33:58.938 - Tags: WindowsAzureActiveDirectoryCustomSingleSignOnApplication, WindowsAzureActiveDirectoryIntegratedApp
+2025-01-18 02:33:58.939 - Login URL: https://vault.bitwarden.eu/#/sso
+2025-01-18 02:33:58.940 - Key Credentials Count: 2
+2025-01-18 02:33:58.941 - IdentifierUris count: 1
+2025-01-18 02:33:58.942 - Found IdentifierUri: https://sso.bitwarden.eu/saml2/a0751154-6cd9-47cd-bf49-b265009da7f4
+2025-01-18 02:34:04.055 - Error restoring application MSCloudNinja - TestENT: Backup does not contain a service principal (Parameter 'backup')
+2025-01-18 02:38:08.816 - Loading backup from: C:\Temp\appsbackup\mscloudTestENT.json
+2025-01-18 02:38:08.942 - Loaded backup for app: MSCloudNinja - TestENT
+2025-01-18 02:38:08.943 - Found Service Principal: MSCloudNinja - TestENT
+2025-01-18 02:38:08.945 - Service Principal Type: Application
+2025-01-18 02:38:08.946 - Tags: WindowsAzureActiveDirectoryCustomSingleSignOnApplication, WindowsAzureActiveDirectoryIntegratedApp
+2025-01-18 02:38:08.947 - Login URL: https://vault.bitwarden.eu/#/sso
+2025-01-18 02:38:08.949 - Key Credentials Count: 2
+2025-01-18 02:38:08.950 - IdentifierUris count: 1
+2025-01-18 02:38:08.951 - Found IdentifierUri: https://sso.bitwarden.eu/saml2/a0751154-6cd9-47cd-bf49-b265009da7f4
+2025-01-18 02:38:14.093 - Validating backup data...
+2025-01-18 02:38:14.095 - Application is null: False
+2025-01-18 02:38:14.095 - ServicePrincipal is null: True
+2025-01-18 02:38:14.096 - DEBUG: Dumping full backup object:
+2025-01-18 02:38:14.132 - {
+  "application": {
+    "Api": {
+      "AdditionalData": {},
+      "BackingStore": {
+        "InitializationCompleted": true,
+        "ReturnOnlyChangedValues": false
+      }
+    },
+    "AppId": "876844ce-84ed-4643-9595-f9c4871c820a",
+    "AppRoles": [],
+    "DisplayName": "MSCloudNinja - TestENT",
+    "Info": {
+      "AdditionalData": {},
+      "BackingStore": {
+        "InitializationCompleted": true,
+        "ReturnOnlyChangedValues": false
+      }
+    },
+    "RequiredResourceAccess": [],
+    "SignInAudience": "AzureADMyOrg",
+    "AdditionalData": {},
+    "BackingStore": {
+      "InitializationCompleted": true,
+      "ReturnOnlyChangedValues": false
+    },
+    "OdataType": "#microsoft.graph.application"
+  },
+  "backupDate": "0001-01-01T00:00:00"
+}
+2025-01-18 02:38:14.193 - Error restoring application MSCloudNinja - TestENT: Backup does not contain a service principal (Parameter 'backup')

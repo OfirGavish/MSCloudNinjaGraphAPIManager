@@ -1,25 +1,33 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading.Tasks;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
 using Microsoft.Graph.ServicePrincipals.Item.AddPassword;
 using Microsoft.Graph.ServicePrincipals.Item.AddKey;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-using System.Text.Json;
-using System.Linq;
-using System.IO;
 using GraphApplication = Microsoft.Graph.Models.Application;
 
 namespace MSCloudNinjaGraphAPI.Services
 {
     public class ApplicationBackup
     {
+        [JsonPropertyName("application")]
         public GraphApplication Application { get; set; }
+        [JsonPropertyName("backupDate")]
         public DateTime BackupDate { get; set; }
+        [JsonPropertyName("servicePrincipal")]
         public ServicePrincipal ServicePrincipal { get; set; }
+        [JsonPropertyName("secrets")]
         public List<PasswordCredential> Secrets { get; set; }
+        [JsonPropertyName("certificates")]
         public List<KeyCredential> Certificates { get; set; }
+        [JsonPropertyName("syncJob")]
         public SynchronizationJob SyncJob { get; set; }
+        [JsonPropertyName("syncTemplate")]
         public SynchronizationTemplate SyncTemplate { get; set; }
     }
 
@@ -85,11 +93,77 @@ namespace MSCloudNinjaGraphAPI.Services
             try
             {
                 var json = await File.ReadAllTextAsync(filePath);
-                var backups = JsonSerializer.Deserialize<List<ApplicationBackup>>(json);
+                await LogAsync($"Loading backup from: {filePath}");
+                
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    ReferenceHandler = ReferenceHandler.Preserve,
+                    Converters = 
+                    {
+                        new JsonStringEnumConverter()
+                    }
+                };
+                
+                var backups = JsonSerializer.Deserialize<List<ApplicationBackup>>(json, options);
+                
+                // Debug logging
+                foreach (var backup in backups ?? new List<ApplicationBackup>())
+                {
+                    await LogAsync($"Loaded backup for app: {backup.Application?.DisplayName}");
+                    
+                    // Log Service Principal details
+                    if (backup.ServicePrincipal != null)
+                    {
+                        await LogAsync($"Found Service Principal: {backup.ServicePrincipal.DisplayName}");
+                        await LogAsync($"Service Principal Type: {backup.ServicePrincipal.ServicePrincipalType}");
+                        await LogAsync($"Tags: {string.Join(", ", backup.ServicePrincipal.Tags ?? new List<string>())}");
+                        await LogAsync($"Login URL: {backup.ServicePrincipal.LoginUrl}");
+                        await LogAsync($"Key Credentials Count: {backup.ServicePrincipal.KeyCredentials?.Count ?? 0}");
+
+                        // Ensure all collections are initialized
+                        backup.ServicePrincipal.Tags ??= new List<string>();
+                        backup.ServicePrincipal.KeyCredentials ??= new List<KeyCredential>();
+                        backup.ServicePrincipal.PasswordCredentials ??= new List<PasswordCredential>();
+                        backup.ServicePrincipal.NotificationEmailAddresses ??= new List<string>();
+                    }
+                    else
+                    {
+                        await LogAsync("WARNING: No Service Principal found in backup!");
+                        // Log the raw JSON for debugging
+                        await LogAsync("Raw JSON for this backup item:");
+                        var rawJson = JsonSerializer.Serialize(backup, new JsonSerializerOptions { WriteIndented = true });
+                        await LogAsync(rawJson);
+                    }
+
+                    // Log Application details
+                    await LogAsync($"IdentifierUris count: {backup.Application?.IdentifierUris?.Count ?? 0}");
+                    if (backup.Application?.IdentifierUris?.Any() == true)
+                    {
+                        foreach (var uri in backup.Application.IdentifierUris)
+                        {
+                            await LogAsync($"Found IdentifierUri: {uri}");
+                        }
+                    }
+                    else
+                    {
+                        await LogAsync("No IdentifierUris found in backup");
+                    }
+                }
+                
                 return backups ?? new List<ApplicationBackup>();
             }
             catch (Exception ex)
             {
+                await LogAsync($"Error loading backup: {ex.Message}");
+                await LogAsync($"Stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null)
+                {
+                    await LogAsync($"Inner exception: {ex.InnerException.Message}");
+                    await LogAsync($"Inner stack trace: {ex.InnerException.StackTrace}");
+                }
                 throw new Exception($"Error loading backup: {ex.Message}", ex);
             }
         }
@@ -188,7 +262,22 @@ namespace MSCloudNinjaGraphAPI.Services
                         var servicePrincipal = await GetServicePrincipalAsync(app.AppId);
                         if (servicePrincipal != null)
                         {
-                            backup.ServicePrincipal = servicePrincipal;
+                            // Create a clean ServicePrincipal object without backing store
+                            backup.ServicePrincipal = new ServicePrincipal
+                            {
+                                AppId = servicePrincipal.AppId,
+                                Id = servicePrincipal.Id,
+                                DisplayName = servicePrincipal.DisplayName,
+                                ServicePrincipalType = servicePrincipal.ServicePrincipalType,
+                                LoginUrl = servicePrincipal.LoginUrl,
+                                PreferredTokenSigningKeyThumbprint = servicePrincipal.PreferredTokenSigningKeyThumbprint,
+                                Tags = servicePrincipal.Tags?.ToList() ?? new List<string>(),
+                                NotificationEmailAddresses = servicePrincipal.NotificationEmailAddresses?.ToList() ?? new List<string>(),
+                                KeyCredentials = servicePrincipal.KeyCredentials?.ToList() ?? new List<KeyCredential>(),
+                                PasswordCredentials = servicePrincipal.PasswordCredentials?.ToList() ?? new List<PasswordCredential>(),
+                                SamlSingleSignOnSettings = servicePrincipal.SamlSingleSignOnSettings,
+                                AppRoleAssignmentRequired = servicePrincipal.AppRoleAssignmentRequired ?? false
+                            };
                             
                             // For SAML apps, log additional details
                             if (servicePrincipal.Tags?.Contains("WindowsAzureActiveDirectoryCustomSingleSignOnApplication") == true)
@@ -226,7 +315,8 @@ namespace MSCloudNinjaGraphAPI.Services
                 var options = new JsonSerializerOptions 
                 { 
                     WriteIndented = true,
-                    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                    ReferenceHandler = ReferenceHandler.IgnoreCycles
                 };
                 
                 var json = JsonSerializer.Serialize(backups, options);
@@ -244,158 +334,119 @@ namespace MSCloudNinjaGraphAPI.Services
         {
             try
             {
-                await LogAsync($"Starting restore process for application: {backup.Application.DisplayName}");
-                await LogAsync("Step 1: Creating Application Registration");
-
-                var app = backup.Application;
-                var newApp = new GraphApplication
+                if (backup == null)
                 {
-                    DisplayName = app.DisplayName,
-                    SignInAudience = app.SignInAudience,
-                    Api = app.Api,
-                    AppRoles = app.AppRoles,
-                    IdentifierUris = app.IdentifierUris,
-                    Info = app.Info,
-                    RequiredResourceAccess = app.RequiredResourceAccess,
-                    Web = app.Web,
-                    Tags = app.Tags
-                };
-
-                await _graphClient.Applications.PostAsync(newApp);
-                await LogAsync($"Created application registration: {newApp.DisplayName}");
-                await Task.Delay(5000); // Wait for app registration to propagate
-
-                // Step 2: Get the new application to get its ID
-                var createdApp = await GetApplicationByAppIdAsync(newApp.AppId);
-                if (createdApp == null)
-                {
-                    throw new Exception("Could not find newly created application");
+                    throw new ArgumentNullException(nameof(backup), "Backup cannot be null");
                 }
 
-                await LogAsync("Step 2: Creating Service Principal");
+                // Log the state of the backup object
+                await LogAsync("Validating backup data...");
+                await LogAsync($"Application is null: {backup.Application == null}");
+                await LogAsync($"ServicePrincipal is null: {backup.ServicePrincipal == null}");
+                if (backup.ServicePrincipal != null)
+                {
+                    await LogAsync($"Service Principal details before restore:");
+                    await LogAsync($"DisplayName: {backup.ServicePrincipal.DisplayName}");
+                    await LogAsync($"AppId: {backup.ServicePrincipal.AppId}");
+                    await LogAsync($"ServicePrincipalType: {backup.ServicePrincipal.ServicePrincipalType}");
+                }
+
+                if (backup.ServicePrincipal == null)
+                {
+                    // Log the entire backup object for debugging
+                    await LogAsync("DEBUG: Dumping full backup object:");
+                    var backupJson = JsonSerializer.Serialize(backup, new JsonSerializerOptions 
+                    { 
+                        WriteIndented = true,
+                        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                    });
+                    await LogAsync(backupJson);
+                    throw new ArgumentException("Backup does not contain a service principal", nameof(backup));
+                }
+
                 var sp = backup.ServicePrincipal;
+                await LogAsync($"Starting restore process for application: {sp.DisplayName}");
+
+                // Create service principal using the non-gallery application template
+                await LogAsync("Creating Enterprise Application using SAML SSO template");
                 var newSp = await _graphClient.ServicePrincipals.PostAsync(new ServicePrincipal
                 {
-                    AppId = newApp.AppId,
-                    AppRoleAssignmentRequired = sp.AppRoleAssignmentRequired,
+                    AppId = "8adf8e6e-67b2-4cf2-a259-e3dc5476c621", // Non-gallery application template ID
+                    ServicePrincipalType = "Application",
+                    AccountEnabled = true,
                     DisplayName = sp.DisplayName,
+                    PreferredSingleSignOnMode = "saml",
                     LoginUrl = sp.LoginUrl,
-                    ServicePrincipalType = sp.ServicePrincipalType,
-                    Tags = sp.Tags,
-                    PreferredTokenSigningKeyThumbprint = sp.PreferredTokenSigningKeyThumbprint
+                    Tags = new List<string> 
+                    { 
+                        "WindowsAzureActiveDirectoryCustomSingleSignOnApplication",
+                        "WindowsAzureActiveDirectoryIntegratedApp"
+                    },
+                    NotificationEmailAddresses = sp.NotificationEmailAddresses ?? new List<string>(),
+                    PreferredTokenSigningKeyThumbprint = sp.PreferredTokenSigningKeyThumbprint,
+                    ReplyUrls = backup.Application?.Web?.RedirectUris?.ToList() ?? new List<string>(),
+                    AppRoleAssignmentRequired = sp.AppRoleAssignmentRequired
                 });
 
-                if (newSp != null)
+                await LogAsync($"Successfully created service principal: {newSp.DisplayName}");
+
+                // Restore certificates if any
+                if (sp.KeyCredentials?.Any() == true)
                 {
-                    await LogAsync($"Created service principal with ID: {newSp.Id}");
-                    await Task.Delay(5000);
-
-                    // Step 3: Update App Registration's web configuration
-                    await LogAsync("Step 3: Updating App Registration web configuration");
-                    if (app.Web?.RedirectUris?.Any() == true)
+                    await LogAsync($"Restoring {sp.KeyCredentials.Count} certificates");
+                    foreach (var cert in sp.KeyCredentials)
                     {
-                        var updateApp = new GraphApplication
+                        try
                         {
-                            Web = app.Web,
-                            IdentifierUris = app.IdentifierUris
-                        };
-                        await _graphClient.Applications[createdApp.Id].PatchAsync(updateApp);
-                        await LogAsync($"Updated App Registration with {app.Web.RedirectUris.Count} Redirect URIs");
-                        foreach (var url in app.Web.RedirectUris)
-                        {
-                            await LogAsync($"Added Redirect URI: {url}");
+                            var addKeyPostRequestBody = new AddKeyPostRequestBody
+                            {
+                                KeyCredential = cert,
+                                Proof = "proof"
+                            };
+
+                            await _graphClient.ServicePrincipals[newSp.Id].AddKey.PostAsync(addKeyPostRequestBody);
+                            await LogAsync($"Restored certificate: {cert.DisplayName}");
                         }
-                        await Task.Delay(2000);
-                    }
-
-                    // Step 4: Add certificates
-                    if (sp.KeyCredentials?.Any() == true)
-                    {
-                        await LogAsync("Step 4: Adding certificates");
-                        foreach (var cert in sp.KeyCredentials)
+                        catch (Exception ex)
                         {
-                            try
-                            {
-                                var keyCredential = new KeyCredential
-                                {
-                                    Type = cert.Type,
-                                    Usage = cert.Usage,
-                                    Key = cert.Key,
-                                    DisplayName = cert.DisplayName,
-                                    StartDateTime = cert.StartDateTime,
-                                    EndDateTime = cert.EndDateTime,
-                                    CustomKeyIdentifier = cert.CustomKeyIdentifier
-                                };
-
-                                await _graphClient.ServicePrincipals[newSp.Id].AddKey.PostAsync(new AddKeyPostRequestBody
-                                {
-                                    KeyCredential = keyCredential,
-                                    Proof = "proof"
-                                });
-                                await LogAsync($"Added certificate: {keyCredential.DisplayName}");
-                                await LogAsync($"Certificate type: {keyCredential.Type}, usage: {keyCredential.Usage}");
-                                await LogAsync($"Valid from {keyCredential.StartDateTime} to {keyCredential.EndDateTime}");
-                                await Task.Delay(2000);
-                            }
-                            catch (Exception certEx)
-                            {
-                                await LogAsync($"Error adding certificate {cert.DisplayName}: {certEx.Message}");
-                            }
+                            await LogAsync($"Error restoring certificate {cert.DisplayName}: {ex.Message}");
                         }
                     }
-
-                    // Step 5: Add password credentials if any
-                    if (sp.PasswordCredentials?.Any() == true)
-                    {
-                        await LogAsync("Step 5: Adding password credentials");
-                        foreach (var cred in sp.PasswordCredentials)
-                        {
-                            try
-                            {
-                                var passwordCredential = new PasswordCredential
-                                {
-                                    DisplayName = cred.DisplayName,
-                                    StartDateTime = cred.StartDateTime,
-                                    EndDateTime = cred.EndDateTime,
-                                    CustomKeyIdentifier = cred.CustomKeyIdentifier
-                                };
-
-                                await _graphClient.ServicePrincipals[newSp.Id].AddPassword.PostAsync(new AddPasswordPostRequestBody
-                                {
-                                    PasswordCredential = passwordCredential
-                                });
-                                await LogAsync($"Added password credential: {passwordCredential.DisplayName}");
-                                await Task.Delay(2000);
-                            }
-                            catch (Exception credEx)
-                            {
-                                await LogAsync($"Error adding password credential {cred.DisplayName}: {credEx.Message}");
-                            }
-                        }
-                    }
-
-                    // Step 6: Update SAML SSO settings
-                    if (sp.Tags?.Contains("WindowsAzureActiveDirectoryCustomSingleSignOnApplication") == true)
-                    {
-                        await LogAsync("Step 6: Updating SAML SSO settings");
-                        var samlSettings = new ServicePrincipal
-                        {
-                            PreferredTokenSigningKeyThumbprint = sp.PreferredTokenSigningKeyThumbprint,
-                            LoginUrl = sp.LoginUrl,
-                            SamlSingleSignOnSettings = sp.SamlSingleSignOnSettings
-                        };
-                        await _graphClient.ServicePrincipals[newSp.Id].PatchAsync(samlSettings);
-                        await LogAsync("Updated SAML SSO settings");
-                        await Task.Delay(2000);
-                    }
-
-                    await LogAsync($"Successfully restored application: {app.DisplayName}");
                 }
+
+                // Restore secrets if any
+                if (sp.PasswordCredentials?.Any() == true)
+                {
+                    await LogAsync($"Restoring {sp.PasswordCredentials.Count} secrets");
+                    foreach (var secret in sp.PasswordCredentials)
+                    {
+                        try
+                        {
+                            var addPasswordPostRequestBody = new AddPasswordPostRequestBody
+                            {
+                                PasswordCredential = secret
+                            };
+
+                            await _graphClient.ServicePrincipals[newSp.Id].AddPassword.PostAsync(addPasswordPostRequestBody);
+                            await LogAsync($"Restored secret: {secret.DisplayName}");
+                        }
+                        catch (Exception ex)
+                        {
+                            await LogAsync($"Error restoring secret {secret.DisplayName}: {ex.Message}");
+                        }
+                    }
+                }
+
+                await LogAsync($"Successfully restored application: {sp.DisplayName}");
             }
             catch (Exception ex)
             {
-                await LogAsync($"Error restoring application {backup.Application.DisplayName}: {ex.Message}");
-                throw new Exception($"Error restoring application {backup.Application.DisplayName}: {ex.Message}", ex);
+                await LogAsync($"Error restoring application {backup?.ServicePrincipal?.DisplayName}: {ex.Message}");
+                if (ex.InnerException != null)
+                {
+                    await LogAsync($"Inner exception: {ex.InnerException.Message}");
+                }
+                throw;
             }
         }
 
