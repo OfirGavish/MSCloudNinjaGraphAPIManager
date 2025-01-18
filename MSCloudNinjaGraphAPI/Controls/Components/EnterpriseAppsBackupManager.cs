@@ -13,6 +13,7 @@ namespace MSCloudNinjaGraphAPI.Controls.Components
     {
         public event EventHandler<string> StatusUpdated;
         public event EventHandler<(string message, bool isError)> ErrorOccurred;
+        public event EventHandler<List<GraphApplication>> BackupLoaded;
 
         private readonly IEnterpriseAppsService _service;
         private readonly EnterpriseAppsDialogManager _dialogManager;
@@ -38,6 +39,8 @@ namespace MSCloudNinjaGraphAPI.Controls.Components
                 OnStatusUpdated("Loading backup...");
                 _loadedBackups = await _service.LoadBackupAsync(backupPath);
                 OnStatusUpdated($"Loaded {_loadedBackups.Count} applications from backup");
+
+                OnBackupLoaded(_loadedBackups.Select(b => b.Application).ToList());
             }
             catch (Exception ex)
             {
@@ -102,6 +105,11 @@ namespace MSCloudNinjaGraphAPI.Controls.Components
         private void OnErrorOccurred(string message, bool isError)
         {
             ErrorOccurred?.Invoke(this, (message, isError));
+        }
+
+        private void OnBackupLoaded(List<GraphApplication> apps)
+        {
+            BackupLoaded?.Invoke(this, apps);
         }
     }
 }

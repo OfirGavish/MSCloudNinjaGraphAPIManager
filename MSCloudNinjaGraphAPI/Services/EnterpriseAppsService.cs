@@ -29,24 +29,74 @@ namespace MSCloudNinjaGraphAPI.Services
         public SynchronizationJob SyncJob { get; set; }
         [JsonPropertyName("syncTemplate")]
         public SynchronizationTemplate SyncTemplate { get; set; }
+        [JsonPropertyName("appRoleAssignments")]
+        public List<AppRoleAssignment> AppRoleAssignments { get; set; }
+        [JsonPropertyName("claimsMapping")]
+        public ClaimsMappingPolicy ClaimsMapping { get; set; }
+        [JsonPropertyName("provisioningConfig")]
+        public ProvisioningConfig ProvisioningConfig { get; set; }
+        [JsonPropertyName("userAssignments")]
+        public List<ServicePrincipalUserAssignment> UserAssignments { get; set; }
+        [JsonPropertyName("groupAssignments")]
+        public List<ServicePrincipalGroupAssignment> GroupAssignments { get; set; }
+        [JsonPropertyName("samlConfiguration")]
+        public SamlConfiguration SamlConfiguration { get; set; }
+    }
+
+    public class ProvisioningConfig
+    {
+        [JsonPropertyName("provisioningSettings")]
+        public SynchronizationSchema ProvisioningSettings { get; set; }
+        [JsonPropertyName("provisioningStatus")]
+        public SynchronizationStatus? ProvisioningStatus { get; set; }
+    }
+
+    public class ServicePrincipalUserAssignment
+    {
+        [JsonPropertyName("userId")]
+        public string UserId { get; set; }
+        [JsonPropertyName("principalDisplayName")]
+        public string PrincipalDisplayName { get; set; }
+        [JsonPropertyName("appRoleId")]
+        public string AppRoleId { get; set; }
+    }
+
+    public class ServicePrincipalGroupAssignment
+    {
+        [JsonPropertyName("groupId")]
+        public string GroupId { get; set; }
+        [JsonPropertyName("groupDisplayName")]
+        public string GroupDisplayName { get; set; }
+        [JsonPropertyName("appRoleId")]
+        public string AppRoleId { get; set; }
+    }
+
+    public class SamlConfiguration
+    {
+        [JsonPropertyName("samlSingleSignOnSettings")]
+        public SamlSingleSignOnSettings SamlSingleSignOnSettings { get; set; }
+        [JsonPropertyName("claimsMappings")]
+        public List<ClaimsMappingPolicy> ClaimsMappings { get; set; }
+        [JsonPropertyName("optionalClaims")]
+        public OptionalClaims OptionalClaims { get; set; }
+        [JsonPropertyName("customAttributes")]
+        public object CustomAttributes { get; set; }
     }
 
     public class EnterpriseAppsService : IEnterpriseAppsService
     {
         private readonly GraphServiceClient _graphClient;
-        private const int PageSize = 999;
-        private readonly string _logFilePath;
+        private readonly LogService _logService;
 
         public EnterpriseAppsService(GraphServiceClient graphClient)
         {
             _graphClient = graphClient;
-            _logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "restore_log.txt");
+            _logService = new LogService();
         }
 
-        private async Task LogAsync(string message)
+        private async Task LogAsync(string message, bool isError = false)
         {
-            var logMessage = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} - {message}{Environment.NewLine}";
-            await File.AppendAllTextAsync(_logFilePath, logMessage);
+            await _logService.LogAsync(message, isError);
         }
 
         public async Task<List<GraphApplication>> GetApplicationsAsync()
@@ -56,7 +106,7 @@ namespace MSCloudNinjaGraphAPI.Services
                 var apps = new List<GraphApplication>();
                 var response = await _graphClient.Applications.GetAsync(config =>
                 {
-                    config.QueryParameters.Top = PageSize;
+                    config.QueryParameters.Top = 999;
                     config.Headers.Add("ConsistencyLevel", "eventual");
                     config.QueryParameters.Count = true;
                     config.QueryParameters.Select = new[]
@@ -239,6 +289,7 @@ namespace MSCloudNinjaGraphAPI.Services
         {
             try
             {
+                await LogAsync($"Starting backup of {apps.Count} applications to {filePath}");
                 var backups = new List<ApplicationBackup>();
                 foreach (var app in apps)
                 {
@@ -247,7 +298,10 @@ namespace MSCloudNinjaGraphAPI.Services
                     var backup = new ApplicationBackup
                     {
                         Application = app,
-                        BackupDate = DateTime.UtcNow
+                        BackupDate = DateTime.UtcNow,
+                        UserAssignments = new List<ServicePrincipalUserAssignment>(),
+                        GroupAssignments = new List<ServicePrincipalGroupAssignment>(),
+                        AppRoleAssignments = new List<AppRoleAssignment>()
                     };
 
                     try
@@ -257,11 +311,14 @@ namespace MSCloudNinjaGraphAPI.Services
                         if (fullApp != null)
                         {
                             backup.Application = fullApp;
+                            await LogAsync($"Retrieved full application details for {fullApp.DisplayName}");
                         }
 
                         var servicePrincipal = await GetServicePrincipalAsync(app.AppId);
                         if (servicePrincipal != null)
                         {
+                            await LogAsync($"Found service principal for {app.DisplayName}");
+                            
                             // Create a clean ServicePrincipal object without backing store
                             backup.ServicePrincipal = new ServicePrincipal
                             {
@@ -278,35 +335,316 @@ namespace MSCloudNinjaGraphAPI.Services
                                 SamlSingleSignOnSettings = servicePrincipal.SamlSingleSignOnSettings,
                                 AppRoleAssignmentRequired = servicePrincipal.AppRoleAssignmentRequired ?? false
                             };
-                            
-                            // For SAML apps, log additional details
-                            if (servicePrincipal.Tags?.Contains("WindowsAzureActiveDirectoryCustomSingleSignOnApplication") == true)
+
+                            await LogAsync("Backing up user assignments...");
+                            try 
                             {
-                                await LogAsync($"Found SAML application: {app.DisplayName}");
-                                await LogAsync($"Login URL: {servicePrincipal.LoginUrl}");
-                                await LogAsync($"Token Signing Key Thumbprint: {servicePrincipal.PreferredTokenSigningKeyThumbprint}");
-                                
-                                if (servicePrincipal.KeyCredentials?.Any() == true)
-                                {
-                                    await LogAsync($"Found {servicePrincipal.KeyCredentials.Count} certificates");
-                                    foreach (var cert in servicePrincipal.KeyCredentials)
+                                var userAssignments = await _graphClient.ServicePrincipals[servicePrincipal.Id].AppRoleAssignedTo
+                                    .GetAsync(requestConfiguration => 
                                     {
-                                        await LogAsync($"Certificate: {cert.DisplayName}, Type: {cert.Type}, Usage: {cert.Usage}");
-                                        await LogAsync($"Valid from {cert.StartDateTime} to {cert.EndDateTime}");
+                                        requestConfiguration.QueryParameters.Select = new[] { "id", "principalId", "principalDisplayName", "appRoleId", "principalType" };
+                                        requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
+                                    });
+
+                                if (userAssignments?.Value != null)
+                                {
+                                    foreach (var assignment in userAssignments.Value)
+                                    {
+                                        // Filter for user assignments
+                                        if (assignment.PrincipalType?.ToString().Equals("User", StringComparison.OrdinalIgnoreCase) == true)
+                                        {
+                                            await LogAsync($"Found user assignment: {assignment.PrincipalDisplayName}");
+                                            backup.UserAssignments.Add(new ServicePrincipalUserAssignment
+                                            {
+                                                UserId = assignment.PrincipalId?.ToString(),
+                                                PrincipalDisplayName = assignment.PrincipalDisplayName,
+                                                AppRoleId = assignment.AppRoleId?.ToString()
+                                            });
+                                        }
                                     }
+                                    await LogAsync($"Total user assignments found: {backup.UserAssignments.Count}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                await LogAsync($"Error backing up user assignments: {ex.Message}", true);
+                            }
+
+                            await LogAsync("Backing up group assignments...");
+                            try 
+                            {
+                                var groupAssignments = await _graphClient.ServicePrincipals[servicePrincipal.Id].AppRoleAssignedTo
+                                    .GetAsync(requestConfiguration => 
+                                    {
+                                        requestConfiguration.QueryParameters.Select = new[] { "id", "principalId", "principalDisplayName", "appRoleId", "principalType" };
+                                        requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
+                                    });
+
+                                if (groupAssignments?.Value != null)
+                                {
+                                    foreach (var assignment in groupAssignments.Value)
+                                    {
+                                        // Filter for group assignments
+                                        if (assignment.PrincipalType?.ToString().Equals("Group", StringComparison.OrdinalIgnoreCase) == true)
+                                        {
+                                            await LogAsync($"Found group assignment: {assignment.PrincipalDisplayName}");
+                                            backup.GroupAssignments.Add(new ServicePrincipalGroupAssignment
+                                            {
+                                                GroupId = assignment.PrincipalId?.ToString(),
+                                                GroupDisplayName = assignment.PrincipalDisplayName,
+                                                AppRoleId = assignment.AppRoleId?.ToString()
+                                            });
+                                        }
+                                    }
+                                    await LogAsync($"Total group assignments found: {backup.GroupAssignments.Count}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                await LogAsync($"Error backing up group assignments: {ex.Message}", true);
+                            }
+
+                            await LogAsync("Backing up claims configuration...");
+                            try
+                            {
+                                // Get standard claims mapping policies
+                                await LogAsync("Fetching standard claims mapping policies...");
+                                var standardPolicies = await _graphClient.Policies.ClaimsMappingPolicies
+                                    .GetAsync(requestConfiguration => 
+                                    {
+                                        requestConfiguration.QueryParameters.Select = new[] { "id", "displayName", "definition" };
+                                        requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
+                                    });
+
+                                if (standardPolicies?.Value?.Any() == true)
+                                {
+                                    await LogAsync($"Found {standardPolicies.Value.Count} standard claims mapping policies");
                                 }
 
-                                if (servicePrincipal.SamlSingleSignOnSettings != null)
+                                // Get assigned policies and SAML settings
+                                await LogAsync("Fetching service principal details...");
+                                var spDetails = await _graphClient.ServicePrincipals[servicePrincipal.Id]
+                                    .GetAsync(requestConfiguration => 
+                                    {
+                                        requestConfiguration.QueryParameters.Select = new[] { 
+                                            "id", 
+                                            "displayName", 
+                                            "preferredSingleSignOnMode",
+                                            "samlSingleSignOnSettings",
+                                            "claimsMappingPolicies"
+                                        };
+                                    });
+
+                                var isSamlApp = spDetails?.PreferredSingleSignOnMode?.Equals("saml", StringComparison.OrdinalIgnoreCase) == true;
+                                await LogAsync($"Application SSO mode: {spDetails?.PreferredSingleSignOnMode}");
+
+                                if (spDetails?.ClaimsMappingPolicies?.Any() == true)
                                 {
-                                    await LogAsync("Found SAML SSO settings");
+                                    backup.ClaimsMapping = spDetails.ClaimsMappingPolicies.FirstOrDefault();
+                                    await LogAsync($"Found claims mapping policy: {backup.ClaimsMapping.DisplayName}");
+                                }
+
+                                if (isSamlApp)
+                                {
+                                    await LogAsync("Application is SAML-based, fetching SAML configuration...");
+
+                                    // Get application-level claims configuration including user claims
+                                    var appClaims = await _graphClient.Applications[backup.Application.Id]
+                                        .GetAsync(requestConfiguration => 
+                                        {
+                                            requestConfiguration.QueryParameters.Select = new[] { 
+                                                "web",
+                                                "api",
+                                                "optionalClaims",
+                                                "groupMembershipClaims",
+                                                "signInAudience",
+                                                "tokenEncryptionKeyId",
+                                                "tokenIssuancePolicies"
+                                            };
+                                            requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
+                                        });
+
+                                    backup.SamlConfiguration = new SamlConfiguration
+                                    {
+                                        SamlSingleSignOnSettings = spDetails.SamlSingleSignOnSettings,
+                                        ClaimsMappings = spDetails.ClaimsMappingPolicies?.ToList(),
+                                        OptionalClaims = appClaims?.OptionalClaims
+                                    };
+
+                                    if (backup.SamlConfiguration.SamlSingleSignOnSettings != null)
+                                    {
+                                        await LogAsync($"Found SAML SSO settings with relay state: {backup.SamlConfiguration.SamlSingleSignOnSettings.RelayState}");
+                                    }
+
+                                    try 
+                                    {
+                                        // Get all claims configuration including user claims
+                                        await LogAsync("Fetching application claims configuration...");
+                                        var appWithClaims = await _graphClient.Applications[backup.Application.Id]
+                                            .GetAsync(requestConfiguration => 
+                                            {
+                                                requestConfiguration.QueryParameters.Select = new[] { 
+                                                    "web",
+                                                    "api",
+                                                    "optionalClaims",
+                                                    "groupMembershipClaims",
+                                                    "signInAudience",
+                                                    "tokenEncryptionKeyId",
+                                                    "tokenIssuancePolicies"
+                                                };
+                                                requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
+                                            });
+
+                                        var claimsData = new Dictionary<string, object>();
+
+                                        // Add web claims
+                                        if (appWithClaims?.Web?.AdditionalData != null)
+                                        {
+                                            foreach (var kvp in appWithClaims.Web.AdditionalData)
+                                            {
+                                                claimsData[$"web_{kvp.Key}"] = kvp.Value;
+                                            }
+                                            await LogAsync($"Found {appWithClaims.Web.AdditionalData.Count} web configuration properties");
+                                        }
+
+                                        // Get claims configuration from service principal
+                                        var spClaims = await _graphClient.ServicePrincipals[servicePrincipal.Id]
+                                            .GetAsync(config => 
+                                            {
+                                                config.Headers.Add("ConsistencyLevel", "eventual");
+                                                config.QueryParameters.Select = new[] { 
+                                                    "appRoleAssignmentRequired",
+                                                    "customSecurityAttributes",
+                                                    "loginUrl",
+                                                    "preferredSingleSignOnMode",
+                                                    "samlSingleSignOnSettings",
+                                                    "servicePrincipalNames",
+                                                    "signInAudience",
+                                                    "tokenEncryptionKeyId",
+                                                    "verifiedPublisher"
+                                                };
+                                            });
+
+                                        if (spClaims?.AdditionalData != null)
+                                        {
+                                            claimsData["servicePrincipalSettings"] = spClaims.AdditionalData;
+                                            await LogAsync("Found service principal settings");
+                                        }
+
+                                        // Add user claims configuration
+                                        if (appWithClaims?.OptionalClaims != null)
+                                        {
+                                            var userClaims = new
+                                            {
+                                                AccessToken = appWithClaims.OptionalClaims.AccessToken?
+                                                    .Select(c => new { 
+                                                        c.Name, 
+                                                        c.Essential, 
+                                                        c.AdditionalProperties, 
+                                                        c.Source
+                                                    }).ToList(),
+                                                IdToken = appWithClaims.OptionalClaims.IdToken?
+                                                    .Select(c => new { 
+                                                        c.Name, 
+                                                        c.Essential, 
+                                                        c.AdditionalProperties, 
+                                                        c.Source
+                                                    }).ToList(),
+                                                Saml2Token = appWithClaims.OptionalClaims.Saml2Token?
+                                                    .Select(c => new { 
+                                                        c.Name, 
+                                                        c.Essential, 
+                                                        c.AdditionalProperties, 
+                                                        c.Source
+                                                    }).ToList()
+                                            };
+                                            claimsData["userClaims"] = userClaims;
+                                            await LogAsync("Found user claims configuration");
+
+                                            // Log claims details
+                                            if (userClaims.Saml2Token?.Any() == true)
+                                            {
+                                                foreach (var claim in userClaims.Saml2Token)
+                                                {
+                                                    var details = new List<string>();
+                                                    if (claim.Source != null) details.Add($"Source: {claim.Source}");
+                                                    if (claim.AdditionalProperties?.Any() == true) 
+                                                        details.Add($"Properties: {string.Join(", ", claim.AdditionalProperties)}");
+                                                    
+                                                    await LogAsync($"Found SAML2 claim: {claim.Name}" + 
+                                                        (details.Any() ? $" ({string.Join(", ", details)})" : ""));
+                                                }
+                                            }
+                                            if (userClaims.AccessToken?.Any() == true)
+                                            {
+                                                foreach (var claim in userClaims.AccessToken)
+                                                {
+                                                    await LogAsync($"Found Access Token claim: {claim.Name}");
+                                                    if (claim.Source != null)
+                                                    {
+                                                        await LogAsync($"  Source: {claim.Source}");
+                                                    }
+                                                }
+                                            }
+                                            if (userClaims.IdToken?.Any() == true)
+                                            {
+                                                foreach (var claim in userClaims.IdToken)
+                                                {
+                                                    await LogAsync($"Found ID Token claim: {claim.Name}");
+                                                    if (claim.Source != null)
+                                                    {
+                                                        await LogAsync($"  Source: {claim.Source}");
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // Add group membership claims if present
+                                        if (appWithClaims.GroupMembershipClaims != null)
+                                        {
+                                            claimsData["groupMembershipClaims"] = appWithClaims.GroupMembershipClaims;
+                                            await LogAsync($"Found group membership claims: {appWithClaims.GroupMembershipClaims}");
+                                        }
+
+                                        backup.SamlConfiguration.CustomAttributes = JsonSerializer.Serialize(claimsData);
+
+                                        // Get claims mapping policies
+                                        var policies = await _graphClient.ServicePrincipals[servicePrincipal.Id]
+                                            .ClaimsMappingPolicies
+                                            .GetAsync();
+                                        if (policies?.Value?.Any() == true)
+                                        {
+                                            await LogAsync($"Found {policies.Value.Count} claims mapping policies");
+                                            backup.SamlConfiguration.ClaimsMappings = policies.Value.ToList();
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        await LogAsync($"Error getting claims configuration: {ex.Message}", true);
+                                    }
+                                }
+                                else
+                                {
+                                    await LogAsync("Application is not configured for SAML SSO");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                await LogAsync($"Error backing up claims configuration: {ex.Message}", true);
+                                if (ex.InnerException != null)
+                                {
+                                    await LogAsync($"Inner exception: {ex.InnerException.Message}", true);
                                 }
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        await LogAsync($"Error backing up app {app.DisplayName}: {ex.Message}");
-                        System.Diagnostics.Debug.WriteLine($"Error backing up app {app.DisplayName}: {ex.Message}");
+                        await LogAsync($"Error backing up app {app.DisplayName}: {ex.Message}", true);
+                        if (ex.InnerException != null)
+                        {
+                            await LogAsync($"Inner exception: {ex.InnerException.Message}", true);
+                        }
                     }
 
                     backups.Add(backup);
@@ -325,8 +663,12 @@ namespace MSCloudNinjaGraphAPI.Services
             }
             catch (Exception ex)
             {
-                await LogAsync($"Error saving backup: {ex.Message}");
-                throw new Exception($"Error saving backup: {ex.Message}", ex);
+                await LogAsync($"Error saving backup: {ex.Message}", true);
+                if (ex.InnerException != null)
+                {
+                    await LogAsync($"Inner exception: {ex.InnerException.Message}", true);
+                }
+                throw;
             }
         }
 
@@ -385,7 +727,8 @@ namespace MSCloudNinjaGraphAPI.Services
                     NotificationEmailAddresses = sp.NotificationEmailAddresses ?? new List<string>(),
                     PreferredTokenSigningKeyThumbprint = sp.PreferredTokenSigningKeyThumbprint,
                     ReplyUrls = backup.Application?.Web?.RedirectUris?.ToList() ?? new List<string>(),
-                    AppRoleAssignmentRequired = sp.AppRoleAssignmentRequired
+                    AppRoleAssignmentRequired = sp.AppRoleAssignmentRequired,
+                    SamlSingleSignOnSettings = sp.SamlSingleSignOnSettings
                 });
 
                 await LogAsync($"Successfully created service principal: {newSp.DisplayName}");
@@ -409,7 +752,7 @@ namespace MSCloudNinjaGraphAPI.Services
                         }
                         catch (Exception ex)
                         {
-                            await LogAsync($"Error restoring certificate {cert.DisplayName}: {ex.Message}");
+                            await LogAsync($"Error restoring certificate {cert.DisplayName}: {ex.Message}", true);
                         }
                     }
                 }
@@ -432,19 +775,82 @@ namespace MSCloudNinjaGraphAPI.Services
                         }
                         catch (Exception ex)
                         {
-                            await LogAsync($"Error restoring secret {secret.DisplayName}: {ex.Message}");
+                            await LogAsync($"Error restoring secret {secret.DisplayName}: {ex.Message}", true);
                         }
                     }
+                }
+
+                // Restore app role assignments
+                if (backup.AppRoleAssignments?.Any() == true)
+                {
+                    await LogAsync($"Restoring {backup.AppRoleAssignments.Count} role assignments");
+                    foreach (var assignment in backup.AppRoleAssignments)
+                    {
+                        try
+                        {
+                            // Handle the nullable Guid conversions
+                            Guid? appRoleId = null;
+                            Guid? principalId = null;
+                            Guid? resourceId = null;
+
+                            if (assignment.AppRoleId != null)
+                            {
+                                appRoleId = Guid.Parse(assignment.AppRoleId.ToString());
+                            }
+                            if (assignment.PrincipalId != null)
+                            {
+                                principalId = Guid.Parse(assignment.PrincipalId.ToString());
+                            }
+                            if (newSp.Id != null)
+                            {
+                                resourceId = Guid.Parse(newSp.Id);
+                            }
+
+                            await _graphClient.ServicePrincipals[newSp.Id].AppRoleAssignments.PostAsync(new AppRoleAssignment
+                            {
+                                PrincipalId = principalId,
+                                ResourceId = resourceId,
+                                AppRoleId = appRoleId
+                            });
+                            
+                            await LogAsync($"Restored role assignment for principal: {assignment.PrincipalId}");
+                        }
+                        catch (Exception ex)
+                        {
+                            await LogAsync($"Error restoring role assignment: {ex.Message}", true);
+                        }
+                    }
+                }
+
+                // Restore claims mapping
+                if (backup.ClaimsMapping != null)
+                {
+                    await LogAsync("Restoring claims mapping policy");
+                    var odataIdString = $"https://graph.microsoft.com/v1.0/policies/claimsMappingPolicies/{backup.ClaimsMapping.Id}";
+                    await _graphClient.ServicePrincipals[newSp.Id].ClaimsMappingPolicies.Ref.PostAsync(new ReferenceCreate
+                    {
+                        OdataId = odataIdString
+                    });
+                }
+
+                // Restore provisioning configuration
+                if (backup.ProvisioningConfig?.ProvisioningSettings != null)
+                {
+                    await LogAsync("Restoring provisioning configuration");
+                    await _graphClient.ServicePrincipals[newSp.Id].Synchronization.Templates.PostAsync(new SynchronizationTemplate
+                    {
+                        Schema = backup.ProvisioningConfig.ProvisioningSettings
+                    });
                 }
 
                 await LogAsync($"Successfully restored application: {sp.DisplayName}");
             }
             catch (Exception ex)
             {
-                await LogAsync($"Error restoring application {backup?.ServicePrincipal?.DisplayName}: {ex.Message}");
+                await LogAsync($"Error restoring application {backup?.ServicePrincipal?.DisplayName}: {ex.Message}", true);
                 if (ex.InnerException != null)
                 {
-                    await LogAsync($"Inner exception: {ex.InnerException.Message}");
+                    await LogAsync($"Inner exception: {ex.InnerException.Message}", true);
                 }
                 throw;
             }

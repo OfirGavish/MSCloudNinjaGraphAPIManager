@@ -223,10 +223,41 @@ namespace MSCloudNinjaGraphAPI.Controls
             {
                 foreach (var item in items)
                 {
-                    var backup = new ApplicationBackup { Application = item };
+                    var backup = new ApplicationBackup 
+                    { 
+                        Application = item,
+                        BackupDate = DateTime.UtcNow,
+                        ServicePrincipal = new ServicePrincipal
+                        {
+                            DisplayName = item.DisplayName,
+                            AppId = item.AppId,
+                            ServicePrincipalType = "Application",
+                            Tags = new List<string> 
+                            { 
+                                "WindowsAzureActiveDirectoryCustomSingleSignOnApplication",
+                                "WindowsAzureActiveDirectoryIntegratedApp"
+                            },
+                            PreferredSingleSignOnMode = "saml",
+                            AppRoleAssignmentRequired = true,
+                            LoginUrl = item.Web?.HomePageUrl,
+                            NotificationEmailAddresses = new List<string>(),
+                            KeyCredentials = new List<KeyCredential>(),
+                            PasswordCredentials = new List<PasswordCredential>()
+                        },
+                        UserAssignments = new List<ServicePrincipalUserAssignment>(),
+                        GroupAssignments = new List<ServicePrincipalGroupAssignment>(),
+                        SamlConfiguration = new SamlConfiguration
+                        {
+                            SamlSingleSignOnSettings = new SamlSingleSignOnSettings(),
+                            ClaimsMappings = new List<ClaimsMappingPolicy>(),
+                            OptionalClaims = item.OptionalClaims ?? new OptionalClaims()
+                        }
+                    };
+
                     await _enterpriseAppsService.RestoreApplicationAsync(backup);
                 }
                 await RefreshGridAsync();
+                UpdateStatus("Applications restored successfully");
             }
             catch (Exception ex)
             {

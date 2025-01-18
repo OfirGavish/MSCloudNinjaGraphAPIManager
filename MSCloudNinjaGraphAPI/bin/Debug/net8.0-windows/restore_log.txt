@@ -127,3 +127,142 @@
   "backupDate": "0001-01-01T00:00:00"
 }
 2025-01-18 02:38:14.193 - Error restoring application MSCloudNinja - TestENT: Backup does not contain a service principal (Parameter 'backup')
+2025-01-18 12:51:33.128 - Loading backup from: C:\Temp\appsbackup\mscloudTestENT.json
+2025-01-18 12:51:33.256 - Loaded backup for app: MSCloudNinja - TestENT
+2025-01-18 12:51:33.257 - Found Service Principal: MSCloudNinja - TestENT
+2025-01-18 12:51:33.258 - Service Principal Type: Application
+2025-01-18 12:51:33.259 - Tags: WindowsAzureActiveDirectoryCustomSingleSignOnApplication, WindowsAzureActiveDirectoryIntegratedApp
+2025-01-18 12:51:33.260 - Login URL: https://vault.bitwarden.eu/#/sso
+2025-01-18 12:51:33.261 - Key Credentials Count: 2
+2025-01-18 12:51:33.262 - IdentifierUris count: 1
+2025-01-18 12:51:33.262 - Found IdentifierUri: https://sso.bitwarden.eu/saml2/a0751154-6cd9-47cd-bf49-b265009da7f4
+2025-01-18 12:51:46.742 - Validating backup data...
+2025-01-18 12:51:46.743 - Application is null: False
+2025-01-18 12:51:46.744 - ServicePrincipal is null: True
+2025-01-18 12:51:46.745 - DEBUG: Dumping full backup object:
+2025-01-18 12:51:46.778 - {
+  "application": {
+    "Api": {
+      "AdditionalData": {},
+      "BackingStore": {
+        "InitializationCompleted": true,
+        "ReturnOnlyChangedValues": false
+      }
+    },
+    "AppId": "876844ce-84ed-4643-9595-f9c4871c820a",
+    "AppRoles": [],
+    "DisplayName": "MSCloudNinja - TestENT",
+    "Info": {
+      "AdditionalData": {},
+      "BackingStore": {
+        "InitializationCompleted": true,
+        "ReturnOnlyChangedValues": false
+      }
+    },
+    "RequiredResourceAccess": [],
+    "SignInAudience": "AzureADMyOrg",
+    "AdditionalData": {},
+    "BackingStore": {
+      "InitializationCompleted": true,
+      "ReturnOnlyChangedValues": false
+    },
+    "OdataType": "#microsoft.graph.application"
+  },
+  "backupDate": "0001-01-01T00:00:00"
+}
+2025-01-18 12:51:46.831 - Error restoring application : Backup does not contain a service principal (Parameter 'backup')
+2025-01-18 13:22:11.393 - Backing up application: ENTAppTest
+2025-01-18 13:22:11.649 - Found SAML application: ENTAppTest
+2025-01-18 13:22:11.650 - Login URL: https://vault.bitwarden.eu/#/sso
+2025-01-18 13:22:11.651 - Token Signing Key Thumbprint: 02750E9711F9D6B51D040054086638773401E932
+2025-01-18 13:22:11.652 - Found 2 certificates
+2025-01-18 13:22:11.653 - Certificate: CN=Microsoft Azure Federated SSO Certificate, Type: AsymmetricX509Cert, Usage: Verify
+2025-01-18 13:22:11.655 - Valid from 1/18/2025 11:19:17 AM +00:00 to 1/18/2028 11:19:16 AM +00:00
+2025-01-18 13:22:11.656 - Certificate: CN=Microsoft Azure Federated SSO Certificate, Type: AsymmetricX509Cert, Usage: Sign
+2025-01-18 13:22:11.657 - Valid from 1/18/2025 11:19:17 AM +00:00 to 1/18/2028 11:19:16 AM +00:00
+2025-01-18 13:22:11.657 - Found SAML SSO settings
+2025-01-18 13:22:11.783 - Backup completed successfully. Saved to: C:\Temp\appsbackup\ENTAppsTest.json
+2025-01-18 13:23:23.963 - Loading backup from: C:\Temp\appsbackup\ENTAppsTest.json
+2025-01-18 13:23:23.985 - Loaded backup for app: ENTAppTest
+2025-01-18 13:23:23.987 - Found Service Principal: ENTAppTest
+2025-01-18 13:23:23.988 - Service Principal Type: Application
+2025-01-18 13:23:23.989 - Tags: WindowsAzureActiveDirectoryCustomSingleSignOnApplication, WindowsAzureActiveDirectoryIntegratedApp
+2025-01-18 13:23:23.992 - Login URL: https://vault.bitwarden.eu/#/sso
+2025-01-18 13:23:23.993 - Key Credentials Count: 2
+2025-01-18 13:23:23.994 - IdentifierUris count: 1
+2025-01-18 13:23:23.994 - Found IdentifierUri: https://sso.bitwarden.eu/saml2/a0751154-6cd9-47cd-bf49-b265009da7f4
+2025-01-18 13:24:19.205 - Validating backup data...
+2025-01-18 13:24:19.219 - Application is null: False
+2025-01-18 13:24:19.220 - ServicePrincipal is null: True
+2025-01-18 13:24:19.225 - DEBUG: Dumping full backup object:
+2025-01-18 13:24:19.250 - {
+  "application": {
+    "Api": {
+      "AdditionalData": {},
+      "BackingStore": {
+        "InitializationCompleted": true,
+        "ReturnOnlyChangedValues": false
+      }
+    },
+    "AppId": "0dfd78eb-24f9-4ada-8ff4-878c784dd32e",
+    "AppRoles": [],
+    "DisplayName": "ENTAppTest",
+    "Info": {
+      "AdditionalData": {},
+      "BackingStore": {
+        "InitializationCompleted": true,
+        "ReturnOnlyChangedValues": false
+      }
+    },
+    "RequiredResourceAccess": [],
+    "SignInAudience": "AzureADMyOrg",
+    "AdditionalData": {},
+    "BackingStore": {
+      "InitializationCompleted": true,
+      "ReturnOnlyChangedValues": false
+    },
+    "OdataType": "#microsoft.graph.application"
+  },
+  "backupDate": "0001-01-01T00:00:00"
+}
+2025-01-18 13:24:19.350 - Error restoring application : Backup does not contain a service principal (Parameter 'backup')
+2025-01-18 14:05:51.714 - Backing up application: ENTAppsTest
+2025-01-18 14:05:52.017 - Found SAML application: ENTAppsTest
+2025-01-18 14:05:52.017 - Login URL: https://vault.bitwarden.eu/#/sso
+2025-01-18 14:05:52.018 - Token Signing Key Thumbprint: 20AC82B7E17FDB9995E014187B7E816C063CF2EE
+2025-01-18 14:05:52.019 - Found 2 certificates
+2025-01-18 14:05:52.021 - Certificate: CN=Microsoft Azure Federated SSO Certificate, Type: AsymmetricX509Cert, Usage: Verify
+2025-01-18 14:05:52.023 - Valid from 1/18/2025 12:01:45 PM +00:00 to 1/18/2028 12:01:45 PM +00:00
+2025-01-18 14:05:52.023 - Certificate: CN=Microsoft Azure Federated SSO Certificate, Type: AsymmetricX509Cert, Usage: Sign
+2025-01-18 14:05:52.024 - Valid from 1/18/2025 12:01:45 PM +00:00 to 1/18/2028 12:01:45 PM +00:00
+2025-01-18 14:05:52.025 - Found SAML SSO settings
+2025-01-18 14:05:52.139 - Backed up 0 role assignments
+2025-01-18 14:05:52.258 - Backed up claims mapping policy
+2025-01-18 14:05:52.392 - Backup completed successfully. Saved to: C:\Temp\appsbackup\ENTAppsTest.json
+2025-01-18 14:16:43.179 - Backing up application: ENTAppsTest
+2025-01-18 14:16:44.421 - Found SAML application: ENTAppsTest
+2025-01-18 14:16:44.422 - Login URL: https://vault.bitwarden.eu/#/sso
+2025-01-18 14:16:44.423 - Token Signing Key Thumbprint: 20AC82B7E17FDB9995E014187B7E816C063CF2EE
+2025-01-18 14:16:44.431 - Found 2 certificates
+2025-01-18 14:16:44.433 - Certificate: CN=Microsoft Azure Federated SSO Certificate, Type: AsymmetricX509Cert, Usage: Verify
+2025-01-18 14:16:44.434 - Valid from 1/18/2025 12:01:45 PM +00:00 to 1/18/2028 12:01:45 PM +00:00
+2025-01-18 14:16:44.434 - Certificate: CN=Microsoft Azure Federated SSO Certificate, Type: AsymmetricX509Cert, Usage: Sign
+2025-01-18 14:16:44.435 - Valid from 1/18/2025 12:01:45 PM +00:00 to 1/18/2028 12:01:45 PM +00:00
+2025-01-18 14:16:44.436 - Found SAML SSO settings
+2025-01-18 14:16:44.743 - Backed up 0 role assignments
+2025-01-18 14:16:45.043 - Backed up claims mapping policy
+2025-01-18 14:16:45.259 - Error backing up app ENTAppsTest: Parsing OData Select and Expand failed: Could not find a property named 'principal' on type 'microsoft.graph.appRoleAssignment'.
+2025-01-18 14:16:45.390 - Backup completed successfully. Saved to: C:\Temp\appsbackup\ENTAppsTest.json
+2025-01-18 14:22:53.848 - Backing up application: ENTAppsTest
+2025-01-18 14:22:54.792 - Found 0 app role assignments
+2025-01-18 14:22:55.003 - Error backing up app ENTAppsTest: Parsing OData Select and Expand failed: Could not find a property named 'principal' on type 'microsoft.graph.appRoleAssignment'.
+2025-01-18 14:22:55.148 - Backup completed successfully. Saved to: C:\Temp\appsbackup\ENTAppsTest.json
+2025-01-18 14:28:43.893 - Backing up application: ENTAppsTest
+2025-01-18 14:28:44.977 - Found 0 app role assignments
+2025-01-18 14:28:45.330 - Error backing up user assignments: Invalid filter clause principalType: System.String
+2025-01-18 14:28:45.666 - Error backing up group assignments: Invalid filter clause principalType: System.String
+2025-01-18 14:28:46.130 - Backup completed successfully. Saved to: C:\Temp\appsbackup\ENTAppsTest.json
+2025-01-18 21:51:21.351 - Backing up application: ENTAppsTest
+2025-01-18 21:51:21.865 - Error backing up app ENTAppsTest: Error getting service principal: Only one property can be expanded in a single query.
+2025-01-18 21:51:21.867 - Inner exception: Only one property can be expanded in a single query.
+2025-01-18 21:51:22.024 - Backup completed successfully. Saved to: C:\Temp\appsbackup\ENTAppsTest.json
