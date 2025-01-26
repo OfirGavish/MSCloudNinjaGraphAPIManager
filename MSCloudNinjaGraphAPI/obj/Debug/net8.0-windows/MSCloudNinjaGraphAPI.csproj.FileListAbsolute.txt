@@ -52,3 +52,5 @@ C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\MSCloudNinjaGraphAPI.genruntimeconfig.cache
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\obj\Debug\net8.0-windows\ref\MSCloudNinja GraphAPI Manager.dll
 C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.Graph.Beta.dll
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\Microsoft.IdentityModel.Validators.dll
+C:\Users\ofirga\source\repos\MSCloudNinjaCAPTool\MSCloudNinjaGraphAPI\bin\Debug\net8.0-windows\System.ClientModel.dll

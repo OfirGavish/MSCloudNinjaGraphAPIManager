@@ -48,224 +48,72 @@ namespace MSCloudNinjaGraphAPI
             return Environment.OSVersion.Version.Major >= 10 && Environment.OSVersion.Version.Build >= build;
         }
 
-        private GraphServiceClient _graphClient = null!;
-        private GraphServiceClient _intuneGraphClient = null!;
-        private readonly string[] _scopes = new[] 
-        { 
-            "Policy.Read.All",
-            "Policy.ReadWrite.ConditionalAccess",
-            "Application.Read.All",
-            "DeviceManagementConfiguration.Read.All",
-            "DeviceManagementConfiguration.ReadWrite.All",
-            "DeviceManagementApps.Read.All",
-            "DeviceManagementApps.ReadWrite.All",
-            "DeviceManagementManagedDevices.Read.All",
-            "DeviceManagementManagedDevices.ReadWrite.All",
-            "DeviceManagementServiceConfig.Read.All",
-            "DeviceManagementServiceConfig.ReadWrite.All"
-        };
-
-        private ClientSecretCredential _appCredentials = null;
-
-        private Panel authPanel = null!;
+        private readonly string[] _scopes = { "User.Read.All", "Group.ReadWrite.All" };
+        private GraphServiceClient? _graphClient;
+        private Label statusLabel = null!;
         private Button browserAuthButton = null!;
         private Button appRegAuthButton = null!;
         private TextBox clientIdTextBox = null!;
         private TextBox tenantIdTextBox = null!;
         private TextBox clientSecretTextBox = null!;
-        private Label statusLabel = null!;
-        private ConditionalAccessControl conditionalAccessControl;
-        private EnterpriseAppsControl enterpriseAppsControl;
-        private IntuneControl intuneControl;
-        private ModernButton btnConditionalAccess;
-        private ModernButton btnEnterpriseApps;
-        private ModernButton btnIntune;
-        private ModernButton btnLogout;
 
         public MainForm()
         {
             InitializeComponent();
             UseImmersiveDarkMode(Handle, true); // Enable dark mode for title bar
-            SetupForm();
+            this.Size = new Size(1200, 800);
+            this.Text = "User Offboarding Tool";
             SetupAuthPanel();
         }
 
         private void SetupAuthPanel()
         {
-            // Create auth panel with modern styling
-            authPanel = new Panel
-            {
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                BackColor = ThemeColors.ContentBackground,
-                Padding = new Padding(30),
-                Anchor = AnchorStyles.None
-            };
+            Controls.Clear();
 
-            this.Load += (s, e) =>
+            var authPanel = new Panel
             {
-                authPanel.Left = (this.ClientSize.Width - authPanel.Width) / 2;
-                authPanel.Top = (this.ClientSize.Height - authPanel.Height) / 2;
-            };
-
-            this.Resize += (s, e) =>
-            {
-                authPanel.Left = (this.ClientSize.Width - authPanel.Width) / 2;
-                authPanel.Top = (this.ClientSize.Height - authPanel.Height) / 2;
-            };
-
-            var authContainer = new Panel
-            {
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                BackColor = ThemeColors.GridBackground,
-                Padding = new Padding(30),
-                Location = new Point(0, 50),
-                Dock = DockStyle.Fill
-            };
-
-            var centerPanel = new TableLayoutPanel
-            {
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                ColumnCount = 1,
                 Dock = DockStyle.Fill,
-                Padding = new Padding(0),
-                BackColor = ThemeColors.GridBackground
+                BackColor = Color.FromArgb(30, 30, 30),
+                Padding = new Padding(20)
             };
-            centerPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
 
-            var authLabel = new Label
+            // Create title label
+            var titleLabel = new Label
             {
-                Text = "Choose Authentication Method",
-                Font = new Font("Segoe UI Light", 24),
-                ForeColor = ThemeColors.TextLight,
+                Text = "User Offboarding Tool",
+                Font = new Font("Segoe UI", 24, FontStyle.Regular),
+                ForeColor = Color.White,
                 AutoSize = true,
-                Margin = new Padding(0, 0, 0, 20),
-                Anchor = AnchorStyles.None,
-                TextAlign = ContentAlignment.MiddleCenter
+                Location = new Point(20, 20)
             };
 
-            browserAuthButton = new ModernButton
+            // Create status label
+            statusLabel = new Label
             {
-                Text = "User Authentication",
-                Width = 400,
-                Margin = new Padding(0, 10, 0, 10),
-                Anchor = AnchorStyles.None
+                Text = "Please authenticate to continue",
+                ForeColor = Color.White,
+                AutoSize = true,
+                Location = new Point(20, titleLabel.Bottom + 20)
+            };
+
+            // Create browser auth button
+            browserAuthButton = new Button
+            {
+                Text = "Authenticate with Browser",
+                BackColor = Color.FromArgb(0, 122, 204),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(200, 40),
+                Location = new Point(20, statusLabel.Bottom + 20)
             };
             browserAuthButton.Click += BrowserAuthButton_Click;
 
-            appRegAuthButton = new ModernButton
-            {
-                Text = "App Registration Authentication",
-                Width = 400,
-                Margin = new Padding(0, 10, 0, 20),
-                Anchor = AnchorStyles.None
-            };
-            appRegAuthButton.Click += AppRegAuthButton_Click;
-
-            // Create input fields for app registration
-            var clientIdLabel = new Label
-            {
-                Text = "Client ID",
-                Font = new Font("Segoe UI", 10),
-                ForeColor = ThemeColors.TextLight,
-                AutoSize = true,
-                Margin = new Padding(0, 10, 0, 5),
-                Anchor = AnchorStyles.None,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-
-            clientIdTextBox = new TextBox
-            {
-                Width = 400,
-                Font = new Font("Segoe UI", 10),
-                BackColor = ThemeColors.GridBackground,
-                ForeColor = ThemeColors.TextLight,
-                BorderStyle = BorderStyle.FixedSingle,
-                Anchor = AnchorStyles.None
-            };
-
-            var tenantIdLabel = new Label
-            {
-                Text = "Tenant ID",
-                Font = new Font("Segoe UI", 10),
-                ForeColor = ThemeColors.TextLight,
-                AutoSize = true,
-                Margin = new Padding(0, 10, 0, 5),
-                Anchor = AnchorStyles.None,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-
-            tenantIdTextBox = new TextBox
-            {
-                Width = 400,
-                Font = new Font("Segoe UI", 10),
-                BackColor = ThemeColors.GridBackground,
-                ForeColor = ThemeColors.TextLight,
-                BorderStyle = BorderStyle.FixedSingle,
-                Anchor = AnchorStyles.None
-            };
-
-            var clientSecretLabel = new Label
-            {
-                Text = "Client Secret",
-                Font = new Font("Segoe UI", 10),
-                ForeColor = ThemeColors.TextLight,
-                AutoSize = true,
-                Margin = new Padding(0, 10, 0, 5),
-                Anchor = AnchorStyles.None,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-
-            clientSecretTextBox = new TextBox
-            {
-                Width = 400,
-                Font = new Font("Segoe UI", 10),
-                BackColor = ThemeColors.GridBackground,
-                ForeColor = ThemeColors.TextLight,
-                BorderStyle = BorderStyle.FixedSingle,
-                Anchor = AnchorStyles.None
-            };
-
-            // Add controls to the center panel
-            centerPanel.Controls.Add(authLabel);
-            centerPanel.Controls.Add(browserAuthButton);
-            centerPanel.Controls.Add(appRegAuthButton);
-            centerPanel.Controls.Add(clientIdLabel);
-            centerPanel.Controls.Add(clientIdTextBox);
-            centerPanel.Controls.Add(tenantIdLabel);
-            centerPanel.Controls.Add(tenantIdTextBox);
-            centerPanel.Controls.Add(clientSecretLabel);
-            centerPanel.Controls.Add(clientSecretTextBox);
-
-            // Add the center panel to the auth container
-            authContainer.Controls.Add(centerPanel);
-
-            // Add status label at the bottom
-            statusLabel = new Label
-            {
-                Text = "Please choose an authentication method",
-                Font = new Font("Segoe UI", 10),
-                ForeColor = ThemeColors.TextLight,
-                AutoSize = true,
-                Margin = new Padding(0, 20, 0, 0),
-                Anchor = AnchorStyles.None,
-                TextAlign = ContentAlignment.MiddleCenter
-            };
-            centerPanel.Controls.Add(statusLabel);
-
-            // Add the auth container to the auth panel
-            authPanel.Controls.Add(authContainer);
-
-            // Initially show only the auth panel
-            mainContent.Controls.Clear();
-            mainContent.Controls.Add(authPanel);
+            authPanel.Controls.AddRange(new Control[] { titleLabel, statusLabel, browserAuthButton });
+            Controls.Add(authPanel);
         }
 
         private async void BrowserAuthButton_Click(object sender, EventArgs e)
         {
-            _appCredentials = null; // Clear app credentials when using browser auth
             try
             {
                 statusLabel.Text = "Opening browser for authentication...";
@@ -302,501 +150,73 @@ namespace MSCloudNinjaGraphAPI
             }
         }
 
-        private async void AppRegAuthButton_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                if (string.IsNullOrWhiteSpace(clientIdTextBox.Text) ||
-                    string.IsNullOrWhiteSpace(tenantIdTextBox.Text) ||
-                    string.IsNullOrWhiteSpace(clientSecretTextBox.Text))
-                {
-                    MessageBox.Show("Please fill in all the required fields.", "Validation Error",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                statusLabel.Text = "Initializing app registration authentication...";
-                System.Windows.Forms.Application.DoEvents();
-
-                _appCredentials = new ClientSecretCredential(
-                    tenantIdTextBox.Text,
-                    clientIdTextBox.Text,
-                    clientSecretTextBox.Text);
-
-                var authProvider = new AzureIdentityAuthenticationProvider(_appCredentials);
-                var requestAdapter = new HttpClientRequestAdapter(authProvider);
-                _graphClient = new GraphServiceClient(requestAdapter);
-
-                // Test authentication by making a simple API call
-                await _graphClient.Users.GetAsync(requestConfiguration =>
-                {
-                    requestConfiguration.QueryParameters.Top = 1;
-                    requestConfiguration.QueryParameters.Select = new[] { "id" };
-                });
-
-                statusLabel.Text = "Authentication successful!";
-                InitializeMainInterface();
-            }
-            catch (Exception ex)
-            {
-                _appCredentials = null;
-                statusLabel.Text = $"Authentication failed: {ex.Message}";
-                MessageBox.Show($"Error during authentication: {ex.Message}", "Authentication Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
         private void InitializeMainInterface()
         {
-            try
-            {
-                // Hide auth panel and show main interface
-                if (authPanel != null)
-                {
-                    mainContent.Controls.Remove(authPanel);
-                    authPanel.Dispose();
-                }
+            Controls.Clear();
 
-                // Make sure mainContent is visible
-                mainContent.Visible = true;
-
-                bool hasAnyAccess = false;
-                bool hasConditionalAccess = false;
-                bool hasEnterpriseApps = false;
-
-                // Try initializing each control separately
-                try
-                {
-                    conditionalAccessControl = new ConditionalAccessControl(_graphClient);
-                    hasConditionalAccess = true;
-                    hasAnyAccess = true;
-                }
-                catch (Exception) { }
-
-                try 
-                {
-                    var enterpriseAppsService = new EnterpriseAppsService(_graphClient);
-                    enterpriseAppsControl = new EnterpriseAppsControl(_graphClient, enterpriseAppsService);
-                    hasEnterpriseApps = true;
-                    hasAnyAccess = true;
-                }
-                catch (Exception) { }
-
-                // Do NOT initialize IntuneControl here as it needs separate authentication
-
-                if (!hasAnyAccess)
-                {
-                    throw new Exception("Insufficient permissions to access any functionality");
-                }
-
-                // Show warning if some controls are not available
-                if (!hasConditionalAccess || !hasEnterpriseApps)
-                {
-                    MessageBox.Show("Only the parts your user or application has access to will be available", 
-                        "Limited Access", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-
-                // Show first available control
-                if (hasConditionalAccess)
-                    SwitchToControl(conditionalAccessControl);
-                else if (hasEnterpriseApps)
-                    SwitchToControl(enterpriseAppsControl);
-
-                // Force a redraw
-                mainContent.Invalidate(true);
-                this.Invalidate(true);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error during authentication: {ex.Message}", "Authentication Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void SetupForm()
-        {
-            // Form settings
-            this.Text = "MSCloudNinja GraphAPI Manager";
-            try
-            {
-                string exePath = Assembly.GetExecutingAssembly().Location;
-                string projectRoot = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(exePath), "..", "..", ".."));
-                string logoPath = Path.Combine(projectRoot, "assets", "logo.png");
-                
-                if (System.IO.File.Exists(logoPath))
-                {
-                    using (var bitmap = new Bitmap(logoPath))
-                    {
-                        IntPtr hIcon = bitmap.GetHicon();
-                        try
-                        {
-                            this.Icon = Icon.FromHandle(hIcon);
-                        }
-                        finally
-                        {
-                            NativeMethods.DestroyIcon(hIcon);
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Log error but continue without icon
-                System.Diagnostics.Debug.WriteLine($"Failed to load icon: {ex.Message}");
-            }
-            
-            this.Size = new Size(1600, 900);
-            this.MinimumSize = new Size(1200, 700);
-            this.StartPosition = FormStartPosition.CenterScreen;
-            this.BackColor = ThemeColors.BackgroundDark;
-
-            // Setup header panel
-            headerPanel.Dock = DockStyle.Top;
-            headerPanel.Height = 50;
-            headerPanel.BackColor = ThemeColors.HeaderBackground;
-            headerPanel.Padding = new Padding(10);
-
-            // Add logo to header
-            var logo = new PictureBox
-            {
-                SizeMode = PictureBoxSizeMode.Zoom,
-                Height = 32,
-                Width = 32,
-                Location = new Point(10, 9)
-            };
-
-            try
-            {
-                using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("MSCloudNinjaGraphAPI.logo.png"))
-                {
-                    if (stream != null)
-                    {
-                        logo.Image = Image.FromStream(stream);
-                    }
-                }
-            }
-            catch (Exception)
-            {
-                // Handle logo loading error if needed
-            }
-
-            // Add title to header with modern font
-            var title = new Label
-            {
-                Text = "MSCloudNinja GraphAPI Manager",
-                Font = new Font("Segoe UI", 12, FontStyle.Regular),
-                ForeColor = ThemeColors.TextLight,
-                AutoSize = true,
-                Location = new Point(50, 14)
-            };
-
-            // Create navigation buttons
-            btnConditionalAccess = new ModernButton
-            {
-                Text = "Conditional Access",
-                Width = 150,
-                Height = 30,
-                BackColor = ThemeColors.HeaderBackground,
-                ForeColor = ThemeColors.TextLight,
-                FlatStyle = FlatStyle.Flat,
-                Location = new Point(400, 10)
-            };
-            btnConditionalAccess.Click += (s, e) => btnConditionalAccess_Click(s, e);
-
-            btnEnterpriseApps = new ModernButton
-            {
-                Text = "Enterprise Apps",
-                Width = 150,
-                Height = 30,
-                BackColor = ThemeColors.HeaderBackground,
-                ForeColor = ThemeColors.TextLight,
-                FlatStyle = FlatStyle.Flat,
-                Location = new Point(560, 10)
-            };
-            btnEnterpriseApps.Click += (s, e) => btnEnterpriseApps_Click(s, e);
-
-             // Create navigation buttons
-            btnIntune = new ModernButton
-            {
-                Text = "Intune",
-                Width = 150,
-                Height = 30,
-                BackColor = ThemeColors.HeaderBackground,
-                ForeColor = ThemeColors.TextLight,
-                FlatStyle = FlatStyle.Flat,
-                Location = new Point(720, 10)
-            };
-            btnIntune.Click += (s, e) => btnIntune_Click(s, e);
-
-            // Add logout button to the far right
-            btnLogout = new ModernButton
-            {
-                Text = "Logout",
-                Width = 100,
-                Height = 30,
-                BackColor = ThemeColors.HeaderBackground,
-                ForeColor = ThemeColors.TextLight,
-                FlatStyle = FlatStyle.Flat,
-                Location = new Point(this.Width - 120, 10),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right // This will keep it on the right when window is resized
-            };
-            btnLogout.Click += (s, e) => btnLogout_Click(s, e);
-
-            // Add controls to header
-            headerPanel.Controls.AddRange(new Control[] { logo, title, btnConditionalAccess, btnEnterpriseApps, btnIntune, btnLogout });
-
-            // Setup main content panel
-            mainContent.Dock = DockStyle.Fill;
-            mainContent.BackColor = ThemeColors.ContentBackground;
-            mainContent.Padding = new Padding(10);
-
-            // Create a container panel for proper layout
-            var containerPanel = new Panel
+            // Create main container
+            var mainContainer = new Panel
             {
                 Dock = DockStyle.Fill,
-                BackColor = ThemeColors.ContentBackground
+                BackColor = Color.FromArgb(30, 30, 30)
             };
 
-            // Add mainContent to container
-            containerPanel.Controls.Add(mainContent);
-
-            // Add panels to form in correct order
-            this.Controls.Add(containerPanel);
-            this.Controls.Add(headerPanel);
-            headerPanel.BringToFront();
-
-            // Set padding for container to account for header
-            containerPanel.Padding = new Padding(0, headerPanel.Height, 0, 0);
-        }
-
-        private class NativeMethods
-        {
-            [DllImport("user32.dll", CharSet = CharSet.Auto)]
-            public static extern bool DestroyIcon(IntPtr handle);
-        }
-
-        private class TokenProvider : IAccessTokenProvider
-        {
-            private readonly string _token;
-
-            public TokenProvider(string token)
+            // Create header panel
+            var headerPanel = new Panel
             {
-                _token = token;
-            }
+                Height = 60,
+                Dock = DockStyle.Top,
+                BackColor = Color.FromArgb(45, 45, 48),
+                Padding = new Padding(10)
+            };
 
-            public AllowedHostsValidator AllowedHostsValidator { get; } = new AllowedHostsValidator();
-
-            public Task<string> GetAuthorizationTokenAsync(Uri uri, Dictionary<string, object> additionalAuthenticationContext = default, CancellationToken cancellationToken = default)
+            // Create title label
+            var titleLabel = new Label
             {
-                return Task.FromResult(_token);
-            }
-        }
+                Text = "User Offboarding Tool",
+                Font = new Font("Segoe UI", 16, FontStyle.Regular),
+                ForeColor = Color.White,
+                AutoSize = true,
+                Location = new Point(20, 15)
+            };
 
-        private void btnConditionalAccess_Click(object sender, EventArgs e)
-        {
-            if (!IsAuthenticated())
+            // Create logout button in header
+            var logoutButton = new Button
             {
-                MessageBox.Show("Please authenticate first.", "Authentication Required",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
+                Text = "Logout",
+                BackColor = Color.FromArgb(60, 60, 60),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(80, 30),
+                Location = new Point(headerPanel.Width - 100, 15),
+                Anchor = AnchorStyles.Right | AnchorStyles.Top
+            };
 
-            btnConditionalAccess.FlatAppearance.BorderColor = Color.DodgerBlue;
-            btnConditionalAccess.FlatAppearance.BorderSize = 2;
-            btnEnterpriseApps.FlatAppearance.BorderColor = Color.FromArgb(40, 40, 40);
-            btnEnterpriseApps.FlatAppearance.BorderSize = 1;
+            headerPanel.Controls.AddRange(new Control[] { titleLabel, logoutButton });
 
-            SwitchToControl(conditionalAccessControl);
-        }
-
-        private void btnEnterpriseApps_Click(object sender, EventArgs e)
-        {
-            if (!IsAuthenticated())
+            // Create content panel
+            var contentPanel = new Panel
             {
-                MessageBox.Show("Please authenticate first.", "Authentication Required",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(30, 30, 30),
+                Padding = new Padding(0, 20, 0, 0) // Add top padding for spacing
+            };
 
-            btnEnterpriseApps.FlatAppearance.BorderColor = Color.DodgerBlue;
-            btnEnterpriseApps.FlatAppearance.BorderSize = 2;
-            btnConditionalAccess.FlatAppearance.BorderColor = Color.FromArgb(40, 40, 40);
-            btnConditionalAccess.FlatAppearance.BorderSize = 1;
+            // Create user offboarding control
+            var userOffboardingControl = new UserOffboardingControl(_graphClient);
 
-            SwitchToControl(enterpriseAppsControl);
-        }
-
-        private bool IsAppRegistrationAuth()
-        {
-            return _appCredentials != null;
-        }
-
-        private void btnIntune_Click(object sender, EventArgs e)
-        {
-            try
+            // Handle logout
+            logoutButton.Click += (s, e) => 
             {
-                if (IsAppRegistrationAuth())
-                {
-                    // For app registration auth, reuse the existing graph client
-                    System.Diagnostics.Debug.WriteLine("Using App Registration authentication for Intune");
-                    _intuneGraphClient = _graphClient;
-                    ShowIntuneControl();
-                    return;
-                }
-                
-                if (_intuneGraphClient == null)
-                {
-                    var intuneAuthForm = new IntuneAuthForm();
-                    if (intuneAuthForm.ShowDialog() == DialogResult.OK)
-                    {
-                        _intuneGraphClient = intuneAuthForm.GraphClient;
-                        System.Diagnostics.Debug.WriteLine("Setting Intune Graph Client from auth form");
-                        
-                        // Verify the token
-                        var adapter = _intuneGraphClient.RequestAdapter as HttpClientRequestAdapter;
-                        if (adapter != null)
-                        {
-                            var authProvider = adapter.GetType().GetField("authProvider", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(adapter) as IAuthenticationProvider;
-                            if (authProvider != null)
-                            {
-                                var testRequest = new RequestInformation
-                                {
-                                    HttpMethod = Method.GET,
-                                    URI = new Uri("https://graph.microsoft.com/v1.0/deviceManagement/deviceConfigurations")
-                                };
-                                authProvider.AuthenticateRequestAsync(testRequest).Wait();
-                                var authHeader = testRequest.Headers["Authorization"].FirstOrDefault();
-                                System.Diagnostics.Debug.WriteLine($"Main form received token: {authHeader?.Substring(7, 50)}...");
-                            }
-                        }
-
-                        ShowIntuneControl();
-                    }
-                }
-                else
-                {
-                    ShowIntuneControl();
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error initializing Intune: {ex.Message}", "Intune Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                _intuneGraphClient = null;
-                intuneControl = null;
-            }
-        }
-
-        private void ShowIntuneControl()
-        {
-            try
-            {
-                if (intuneControl == null)
-                {
-                    System.Diagnostics.Debug.WriteLine("Creating new IntuneControl with Graph Client");
-                    
-                    // Verify the token again before creating control
-                    var adapter = _intuneGraphClient.RequestAdapter as HttpClientRequestAdapter;
-                    if (adapter != null)
-                    {
-                        var authProvider = adapter.GetType().GetField("authProvider", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(adapter) as IAuthenticationProvider;
-                        if (authProvider != null)
-                        {
-                            var testRequest = new RequestInformation
-                            {
-                                HttpMethod = Method.GET,
-                                URI = new Uri("https://graph.microsoft.com/v1.0/deviceManagement/deviceConfigurations")
-                            };
-                            authProvider.AuthenticateRequestAsync(testRequest).Wait();
-                            var authHeader = testRequest.Headers["Authorization"].FirstOrDefault();
-                            System.Diagnostics.Debug.WriteLine($"Creating IntuneControl with token: {authHeader?.Substring(7, 50)}...");
-                        }
-                    }
-                    
-                    intuneControl = new IntuneControl(_intuneGraphClient);
-                    intuneControl.Dock = DockStyle.Fill;
-                }
-                
-                SwitchToControl(intuneControl);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error accessing Intune: {ex.Message}", "Intune Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                _intuneGraphClient = null;
-                intuneControl = null;
-            }
-        }
-
-        private bool IsAuthenticated()
-        {
-            return _graphClient != null;
-        }
-
-        private void SwitchToControl(Control control)
-        {
-            // Update button states
-            btnConditionalAccess.BackColor = control == conditionalAccessControl ? 
-                Color.FromArgb(60, 60, 60) : ThemeColors.HeaderBackground;
-            btnEnterpriseApps.BackColor = control == enterpriseAppsControl ? 
-                Color.FromArgb(60, 60, 60) : ThemeColors.HeaderBackground;
-            btnIntune.BackColor = control == intuneControl ? 
-                Color.FromArgb(60, 60, 60) : ThemeColors.HeaderBackground;
-
-            // Switch the visible control
-            mainContent.Controls.Clear();
-            control.Dock = DockStyle.Fill;
-            mainContent.Controls.Add(control);
-        }
-
-        private void btnLogout_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                // Clear all clients and controls
                 _graphClient = null;
-                _intuneGraphClient = null;
-                _appCredentials = null;
-                
-                if (conditionalAccessControl != null)
-                {
-                    conditionalAccessControl.Dispose();
-                    conditionalAccessControl = null;
-                }
-                
-                if (enterpriseAppsControl != null)
-                {
-                    enterpriseAppsControl.Dispose();
-                    enterpriseAppsControl = null;
-                }
-                
-                if (intuneControl != null)
-                {
-                    intuneControl.Dispose();
-                    intuneControl = null;
-                }
-
-                // Clear the main content
-                mainContent.Controls.Clear();
-
-                // Reset text boxes
-                clientIdTextBox.Text = string.Empty;
-                tenantIdTextBox.Text = string.Empty;
-                clientSecretTextBox.Text = string.Empty;
-                
-                // Reset status label
-                statusLabel.Text = "Please choose an authentication method";
-
-                // Create and show new auth panel
+                Controls.Clear();
                 SetupAuthPanel();
+            };
 
-                System.Diagnostics.Debug.WriteLine("Logged out successfully");
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error during logout: {ex.Message}", "Logout Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            contentPanel.Controls.Add(userOffboardingControl);
+            mainContainer.Controls.Add(headerPanel);
+            mainContainer.Controls.Add(contentPanel);
+            Controls.Add(mainContainer);
         }
     }
 }
