@@ -5,93 +5,37 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using Azure.Core;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
+using Microsoft.Kiota.Authentication.Azure;
+using Microsoft.Kiota.Abstractions.Authentication;
+using Azure.Identity;
+using MSCloudNinjaGraphAPI.Services.Interfaces;
+using MSCloudNinjaGraphAPI.Models;
 using Microsoft.Graph.ServicePrincipals.Item.AddPassword;
 using Microsoft.Graph.ServicePrincipals.Item.AddKey;
+using Microsoft.Kiota.Abstractions;
+using Microsoft.Kiota.Http.HttpClientLibrary;
+using System.Net.Http.Headers;
+using System.Net.Http;
 using GraphApplication = Microsoft.Graph.Models.Application;
 
 namespace MSCloudNinjaGraphAPI.Services
 {
-    public class ApplicationBackup
-    {
-        [JsonPropertyName("application")]
-        public GraphApplication Application { get; set; }
-        [JsonPropertyName("backupDate")]
-        public DateTime BackupDate { get; set; }
-        [JsonPropertyName("servicePrincipal")]
-        public ServicePrincipal ServicePrincipal { get; set; }
-        [JsonPropertyName("secrets")]
-        public List<PasswordCredential> Secrets { get; set; }
-        [JsonPropertyName("certificates")]
-        public List<KeyCredential> Certificates { get; set; }
-        [JsonPropertyName("syncJob")]
-        public SynchronizationJob SyncJob { get; set; }
-        [JsonPropertyName("syncTemplate")]
-        public SynchronizationTemplate SyncTemplate { get; set; }
-        [JsonPropertyName("appRoleAssignments")]
-        public List<AppRoleAssignment> AppRoleAssignments { get; set; }
-        [JsonPropertyName("claimsMapping")]
-        public ClaimsMappingPolicy ClaimsMapping { get; set; }
-        [JsonPropertyName("provisioningConfig")]
-        public ProvisioningConfig ProvisioningConfig { get; set; }
-        [JsonPropertyName("userAssignments")]
-        public List<ServicePrincipalUserAssignment> UserAssignments { get; set; }
-        [JsonPropertyName("groupAssignments")]
-        public List<ServicePrincipalGroupAssignment> GroupAssignments { get; set; }
-        [JsonPropertyName("samlConfiguration")]
-        public SamlConfiguration SamlConfiguration { get; set; }
-    }
-
-    public class ProvisioningConfig
-    {
-        [JsonPropertyName("provisioningSettings")]
-        public SynchronizationSchema ProvisioningSettings { get; set; }
-        [JsonPropertyName("provisioningStatus")]
-        public SynchronizationStatus? ProvisioningStatus { get; set; }
-    }
-
-    public class ServicePrincipalUserAssignment
-    {
-        [JsonPropertyName("userId")]
-        public string UserId { get; set; }
-        [JsonPropertyName("principalDisplayName")]
-        public string PrincipalDisplayName { get; set; }
-        [JsonPropertyName("appRoleId")]
-        public string AppRoleId { get; set; }
-    }
-
-    public class ServicePrincipalGroupAssignment
-    {
-        [JsonPropertyName("groupId")]
-        public string GroupId { get; set; }
-        [JsonPropertyName("groupDisplayName")]
-        public string GroupDisplayName { get; set; }
-        [JsonPropertyName("appRoleId")]
-        public string AppRoleId { get; set; }
-    }
-
-    public class SamlConfiguration
-    {
-        [JsonPropertyName("samlSingleSignOnSettings")]
-        public SamlSingleSignOnSettings SamlSingleSignOnSettings { get; set; }
-        [JsonPropertyName("claimsMappings")]
-        public List<ClaimsMappingPolicy> ClaimsMappings { get; set; }
-        [JsonPropertyName("optionalClaims")]
-        public OptionalClaims OptionalClaims { get; set; }
-        [JsonPropertyName("customAttributes")]
-        public object CustomAttributes { get; set; }
-    }
-
     public class EnterpriseAppsService : IEnterpriseAppsService
     {
         private readonly GraphServiceClient _graphClient;
         private readonly LogService _logService;
+        private readonly SsoSettingsService _ssoSettingsService;
+        private readonly IBackupComponent _backupComponent;
 
         public EnterpriseAppsService(GraphServiceClient graphClient)
         {
             _graphClient = graphClient;
             _logService = new LogService();
+            _backupComponent = new BackupComponent();
+            _ssoSettingsService = new SsoSettingsService(_backupComponent);
         }
 
         private async Task LogAsync(string message, bool isError = false)
@@ -99,190 +43,68 @@ namespace MSCloudNinjaGraphAPI.Services
             await _logService.LogAsync(message, isError);
         }
 
-        public async Task<List<GraphApplication>> GetApplicationsAsync()
+        private async Task<string> GetGraphTokenAsync()
         {
             try
             {
-                var apps = new List<GraphApplication>();
-                var response = await _graphClient.Applications.GetAsync(config =>
+                // Try to get the token by making a direct request to Graph API
+                var response = await _graphClient.Users.GetAsync(requestConfiguration =>
                 {
-                    config.QueryParameters.Top = 999;
-                    config.Headers.Add("ConsistencyLevel", "eventual");
-                    config.QueryParameters.Count = true;
-                    config.QueryParameters.Select = new[]
-                    {
-                        "id", "appId", "displayName", "description", "notes",
-                        "publisherDomain", "signInAudience", "identifierUris",
-                        "web", "spa", "publicClient", "requiredResourceAccess", "api",
-                        "appRoles", "info", "isDeviceOnlyAuthSupported",
-                        "isFallbackPublicClient", "tags", "certification",
-                        "disabledByMicrosoftStatus", "groupMembershipClaims",
-                        "optionalClaims", "parentalControlSettings", "publicClient",
-                        "requestSignatureVerification", "servicePrincipalLockConfiguration",
-                        "tokenEncryptionKeyId", "verifiedPublisher", "defaultRedirectUri",
-                        "synchronization"
-                    };
-                    config.QueryParameters.Orderby = new[] { "displayName asc" };
+                    requestConfiguration.QueryParameters.Top = 1;
+                    requestConfiguration.QueryParameters.Select = new[] { "id" };
                 });
 
-                if (response?.Value != null)
+                // If we got here, we can access the adapter
+                if (_graphClient.RequestAdapter is HttpClientRequestAdapter adapter)
                 {
-                    apps.AddRange(response.Value);
-                }
-
-                return apps;
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error getting applications: {ex.Message}", ex);
-            }
-        }
-
-        public async Task<List<ApplicationBackup>> LoadBackupAsync(string filePath)
-        {
-            try
-            {
-                var json = await File.ReadAllTextAsync(filePath);
-                await LogAsync($"Loading backup from: {filePath}");
-                
-                var options = new JsonSerializerOptions
-                {
-                    PropertyNameCaseInsensitive = true,
-                    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                    ReferenceHandler = ReferenceHandler.Preserve,
-                    Converters = 
-                    {
-                        new JsonStringEnumConverter()
-                    }
-                };
-                
-                var backups = JsonSerializer.Deserialize<List<ApplicationBackup>>(json, options);
-                
-                // Debug logging
-                foreach (var backup in backups ?? new List<ApplicationBackup>())
-                {
-                    await LogAsync($"Loaded backup for app: {backup.Application?.DisplayName}");
+                    var handler = adapter.GetType().GetField("pipeline", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)?.GetValue(adapter) as HttpMessageHandler;
+                    var httpClient = new HttpClient(handler);
                     
-                    // Log Service Principal details
-                    if (backup.ServicePrincipal != null)
+                    var request = new HttpRequestMessage(HttpMethod.Get, "https://graph.microsoft.com/v1.0/users?$top=1");
+                    var result = await httpClient.SendAsync(request);
+                    
+                    if (result.IsSuccessStatusCode)
                     {
-                        await LogAsync($"Found Service Principal: {backup.ServicePrincipal.DisplayName}");
-                        await LogAsync($"Service Principal Type: {backup.ServicePrincipal.ServicePrincipalType}");
-                        await LogAsync($"Tags: {string.Join(", ", backup.ServicePrincipal.Tags ?? new List<string>())}");
-                        await LogAsync($"Login URL: {backup.ServicePrincipal.LoginUrl}");
-                        await LogAsync($"Key Credentials Count: {backup.ServicePrincipal.KeyCredentials?.Count ?? 0}");
-
-                        // Ensure all collections are initialized
-                        backup.ServicePrincipal.Tags ??= new List<string>();
-                        backup.ServicePrincipal.KeyCredentials ??= new List<KeyCredential>();
-                        backup.ServicePrincipal.PasswordCredentials ??= new List<PasswordCredential>();
-                        backup.ServicePrincipal.NotificationEmailAddresses ??= new List<string>();
-                    }
-                    else
-                    {
-                        await LogAsync("WARNING: No Service Principal found in backup!");
-                        // Log the raw JSON for debugging
-                        await LogAsync("Raw JSON for this backup item:");
-                        var rawJson = JsonSerializer.Serialize(backup, new JsonSerializerOptions { WriteIndented = true });
-                        await LogAsync(rawJson);
-                    }
-
-                    // Log Application details
-                    await LogAsync($"IdentifierUris count: {backup.Application?.IdentifierUris?.Count ?? 0}");
-                    if (backup.Application?.IdentifierUris?.Any() == true)
-                    {
-                        foreach (var uri in backup.Application.IdentifierUris)
+                        var authHeader = result.RequestMessage?.Headers.Authorization;
+                        if (authHeader != null)
                         {
-                            await LogAsync($"Found IdentifierUri: {uri}");
+                            return authHeader.Parameter;
                         }
                     }
-                    else
-                    {
-                        await LogAsync("No IdentifierUris found in backup");
-                    }
+                    await LogAsync($"Request failed with status: {result.StatusCode}", true);
+                }
+                else
+                {
+                    await LogAsync("RequestAdapter is not of type HttpClientRequestAdapter", true);
                 }
                 
-                return backups ?? new List<ApplicationBackup>();
+                return null;
             }
             catch (Exception ex)
             {
-                await LogAsync($"Error loading backup: {ex.Message}");
-                await LogAsync($"Stack trace: {ex.StackTrace}");
+                await LogAsync($"Failed to get Graph token: {ex.GetType().Name} - {ex.Message}", true);
                 if (ex.InnerException != null)
                 {
-                    await LogAsync($"Inner exception: {ex.InnerException.Message}");
-                    await LogAsync($"Inner stack trace: {ex.InnerException.StackTrace}");
+                    await LogAsync($"Inner exception: {ex.InnerException.Message}", true);
                 }
-                throw new Exception($"Error loading backup: {ex.Message}", ex);
+                return null;
             }
         }
 
-        private async Task<GraphApplication> GetApplicationByAppIdAsync(string appId)
+        public async Task<List<GraphApplication>> GetApplicationsAsync()
         {
-            try
-            {
-                var response = await _graphClient.Applications.GetAsync(config =>
-                {
-                    config.QueryParameters.Filter = $"appId eq '{appId}'";
-                    config.QueryParameters.Select = new string[]
-                    {
-                        "id",
-                        "appId",
-                        "displayName",
-                        "identifierUris",
-                        "api",
-                        "appRoles",
-                        "info",
-                        "keyCredentials",
-                        "passwordCredentials",
-                        "publicClient",
-                        "requiredResourceAccess",
-                        "signInAudience",
-                        "spa",
-                        "tags",
-                        "web"
-                    };
-                });
-
-                return response?.Value?.FirstOrDefault();
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error getting application by AppId: {ex.Message}", ex);
-            }
+            var apps = await _graphClient.Applications.GetAsync();
+            return apps?.Value?.ToList() ?? new List<GraphApplication>();
         }
 
-        private async Task<ServicePrincipal> GetServicePrincipalAsync(string appId)
+        public async Task<GraphApplication> GetApplicationByAppIdAsync(string appId)
         {
-            try
+            var apps = await _graphClient.Applications.GetAsync(requestConfiguration =>
             {
-                var response = await _graphClient.ServicePrincipals.GetAsync(config =>
-                {
-                    config.QueryParameters.Filter = $"appId eq '{appId}'";
-                    config.QueryParameters.Select = new string[] 
-                    { 
-                        "id",
-                        "appId",
-                        "displayName",
-                        "appRoleAssignmentRequired",
-                        "loginUrl",
-                        "logoutUrl",
-                        "preferredTokenSigningKeyThumbprint",
-                        "samlSingleSignOnSettings",
-                        "servicePrincipalType",
-                        "tags",
-                        "keyCredentials",
-                        "passwordCredentials"
-                    };
-                });
+                requestConfiguration.QueryParameters.Filter = $"appId eq '{appId}'";
+            });
 
-                return response?.Value?.FirstOrDefault();
-            }
-            catch (Exception ex)
-            {
-                throw new Exception($"Error getting service principal: {ex.Message}", ex);
-            }
+            return apps?.Value?.FirstOrDefault();
         }
 
         public async Task SaveBackupAsync(List<GraphApplication> apps, string filePath)
@@ -294,7 +116,7 @@ namespace MSCloudNinjaGraphAPI.Services
                 foreach (var app in apps)
                 {
                     await LogAsync($"Backing up application: {app.DisplayName}");
-                    
+
                     var backup = new ApplicationBackup
                     {
                         Application = app,
@@ -318,7 +140,7 @@ namespace MSCloudNinjaGraphAPI.Services
                         if (servicePrincipal != null)
                         {
                             await LogAsync($"Found service principal for {app.DisplayName}");
-                            
+
                             // Create a clean ServicePrincipal object without backing store
                             backup.ServicePrincipal = new ServicePrincipal
                             {
@@ -336,11 +158,35 @@ namespace MSCloudNinjaGraphAPI.Services
                                 AppRoleAssignmentRequired = servicePrincipal.AppRoleAssignmentRequired ?? false
                             };
 
+                            // Backup SSO Configuration
+                            try
+                            {
+                                var token = await GetGraphTokenAsync();
+                                if (!string.IsNullOrEmpty(token))
+                                {
+                                    await LogAsync("Backing up SSO configuration...");
+                                    var settingsId = await _ssoSettingsService.GetSsoSettingsId(app.AppId, token);
+                                    if (!string.IsNullOrEmpty(settingsId))
+                                    {
+                                        backup.SsoConfiguration = await _ssoSettingsService.GetSsoConfiguration(app.AppId, settingsId, token);
+                                        await LogAsync("Successfully backed up SSO configuration");
+                                    }
+                                }
+                                else
+                                {
+                                    await LogAsync("Could not get Graph token for SSO configuration backup", true);
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                await LogAsync($"Error backing up SSO configuration: {ex.Message}", true);
+                            }
+
                             await LogAsync("Backing up user assignments...");
-                            try 
+                            try
                             {
                                 var userAssignments = await _graphClient.ServicePrincipals[servicePrincipal.Id].AppRoleAssignedTo
-                                    .GetAsync(requestConfiguration => 
+                                    .GetAsync(requestConfiguration =>
                                     {
                                         requestConfiguration.QueryParameters.Select = new[] { "id", "principalId", "principalDisplayName", "appRoleId", "principalType" };
                                         requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
@@ -371,10 +217,10 @@ namespace MSCloudNinjaGraphAPI.Services
                             }
 
                             await LogAsync("Backing up group assignments...");
-                            try 
+                            try
                             {
                                 var groupAssignments = await _graphClient.ServicePrincipals[servicePrincipal.Id].AppRoleAssignedTo
-                                    .GetAsync(requestConfiguration => 
+                                    .GetAsync(requestConfiguration =>
                                     {
                                         requestConfiguration.QueryParameters.Select = new[] { "id", "principalId", "principalDisplayName", "appRoleId", "principalType" };
                                         requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
@@ -410,7 +256,7 @@ namespace MSCloudNinjaGraphAPI.Services
                                 // Get standard claims mapping policies
                                 await LogAsync("Fetching standard claims mapping policies...");
                                 var standardPolicies = await _graphClient.Policies.ClaimsMappingPolicies
-                                    .GetAsync(requestConfiguration => 
+                                    .GetAsync(requestConfiguration =>
                                     {
                                         requestConfiguration.QueryParameters.Select = new[] { "id", "displayName", "definition" };
                                         requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
@@ -424,13 +270,14 @@ namespace MSCloudNinjaGraphAPI.Services
                                 // Get assigned policies and SAML settings
                                 await LogAsync("Fetching service principal details...");
                                 var spDetails = await _graphClient.ServicePrincipals[servicePrincipal.Id]
-                                    .GetAsync(requestConfiguration => 
+                                    .GetAsync(requestConfiguration =>
                                     {
-                                        requestConfiguration.QueryParameters.Select = new[] { 
-                                            "id", 
-                                            "displayName", 
+                                        requestConfiguration.QueryParameters.Select = new[] {
+                                            "id",
+                                            "displayName",
                                             "preferredSingleSignOnMode",
                                             "samlSingleSignOnSettings",
+                                            "servicePrincipalType",
                                             "claimsMappingPolicies"
                                         };
                                     });
@@ -450,9 +297,9 @@ namespace MSCloudNinjaGraphAPI.Services
 
                                     // Get application-level claims configuration including user claims
                                     var appClaims = await _graphClient.Applications[backup.Application.Id]
-                                        .GetAsync(requestConfiguration => 
+                                        .GetAsync(requestConfiguration =>
                                         {
-                                            requestConfiguration.QueryParameters.Select = new[] { 
+                                            requestConfiguration.QueryParameters.Select = new[] {
                                                 "web",
                                                 "api",
                                                 "optionalClaims",
@@ -476,14 +323,14 @@ namespace MSCloudNinjaGraphAPI.Services
                                         await LogAsync($"Found SAML SSO settings with relay state: {backup.SamlConfiguration.SamlSingleSignOnSettings.RelayState}");
                                     }
 
-                                    try 
+                                    try
                                     {
                                         // Get all claims configuration including user claims
                                         await LogAsync("Fetching application claims configuration...");
                                         var appWithClaims = await _graphClient.Applications[backup.Application.Id]
-                                            .GetAsync(requestConfiguration => 
+                                            .GetAsync(requestConfiguration =>
                                             {
-                                                requestConfiguration.QueryParameters.Select = new[] { 
+                                                requestConfiguration.QueryParameters.Select = new[] {
                                                     "web",
                                                     "api",
                                                     "optionalClaims",
@@ -509,10 +356,10 @@ namespace MSCloudNinjaGraphAPI.Services
 
                                         // Get claims configuration from service principal
                                         var spClaims = await _graphClient.ServicePrincipals[servicePrincipal.Id]
-                                            .GetAsync(config => 
+                                            .GetAsync(config =>
                                             {
                                                 config.Headers.Add("ConsistencyLevel", "eventual");
-                                                config.QueryParameters.Select = new[] { 
+                                                config.QueryParameters.Select = new[] {
                                                     "appRoleAssignmentRequired",
                                                     "customSecurityAttributes",
                                                     "loginUrl",
@@ -537,26 +384,11 @@ namespace MSCloudNinjaGraphAPI.Services
                                             var userClaims = new
                                             {
                                                 AccessToken = appWithClaims.OptionalClaims.AccessToken?
-                                                    .Select(c => new { 
-                                                        c.Name, 
-                                                        c.Essential, 
-                                                        c.AdditionalProperties, 
-                                                        c.Source
-                                                    }).ToList(),
+                                                    .Select(c => new { c.Name, c.Essential, c.AdditionalProperties, c.Source }).ToList(),
                                                 IdToken = appWithClaims.OptionalClaims.IdToken?
-                                                    .Select(c => new { 
-                                                        c.Name, 
-                                                        c.Essential, 
-                                                        c.AdditionalProperties, 
-                                                        c.Source
-                                                    }).ToList(),
+                                                    .Select(c => new { c.Name, c.Essential, c.AdditionalProperties, c.Source }).ToList(),
                                                 Saml2Token = appWithClaims.OptionalClaims.Saml2Token?
-                                                    .Select(c => new { 
-                                                        c.Name, 
-                                                        c.Essential, 
-                                                        c.AdditionalProperties, 
-                                                        c.Source
-                                                    }).ToList()
+                                                    .Select(c => new { c.Name, c.Essential, c.AdditionalProperties, c.Source }).ToList()
                                             };
                                             claimsData["userClaims"] = userClaims;
                                             await LogAsync("Found user claims configuration");
@@ -568,10 +400,10 @@ namespace MSCloudNinjaGraphAPI.Services
                                                 {
                                                     var details = new List<string>();
                                                     if (claim.Source != null) details.Add($"Source: {claim.Source}");
-                                                    if (claim.AdditionalProperties?.Any() == true) 
+                                                    if (claim.AdditionalProperties?.Any() == true)
                                                         details.Add($"Properties: {string.Join(", ", claim.AdditionalProperties)}");
-                                                    
-                                                    await LogAsync($"Found SAML2 claim: {claim.Name}" + 
+
+                                                    await LogAsync($"Found SAML2 claim: {claim.Name}" +
                                                         (details.Any() ? $" ({string.Join(", ", details)})" : ""));
                                                 }
                                             }
@@ -650,25 +482,396 @@ namespace MSCloudNinjaGraphAPI.Services
                     backups.Add(backup);
                 }
 
-                var options = new JsonSerializerOptions 
-                { 
+                var options = new JsonSerializerOptions
+                {
                     WriteIndented = true,
                     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-                    ReferenceHandler = ReferenceHandler.IgnoreCycles
+                    ReferenceHandler = ReferenceHandler.Preserve
                 };
-                
+
                 var json = JsonSerializer.Serialize(backups, options);
                 await File.WriteAllTextAsync(filePath, json);
                 await LogAsync($"Backup completed successfully. Saved to: {filePath}");
             }
             catch (Exception ex)
             {
-                await LogAsync($"Error saving backup: {ex.Message}", true);
+                var errorMessage = $"Error during backup: {ex.Message}";
+                await LogAsync(errorMessage, true);
+                throw new Exception(errorMessage, ex);
+            }
+        }
+
+        public async Task BackupApplicationsAsync(IEnumerable<GraphApplication> applications, string defaultClaimsAccessToken = null)
+        {
+            try
+            {
+                var savePath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                    "EnterpriseAppsBackup",
+                    $"backup_{DateTime.Now:yyyyMMddHHmmss}.json"
+                );
+
+                // Create directory if it doesn't exist
+                Directory.CreateDirectory(Path.GetDirectoryName(savePath));
+
+                var apps = applications.ToList();
+                await LogAsync($"Starting backup of {apps.Count} applications to {savePath}");
+                var backups = new List<ApplicationBackup>();
+
+                foreach (var app in apps)
+                {
+                    await LogAsync($"Backing up application: {app.DisplayName}");
+
+                    var backup = new ApplicationBackup
+                    {
+                        Application = app,
+                        BackupDate = DateTime.UtcNow,
+                        UserAssignments = new List<ServicePrincipalUserAssignment>(),
+                        GroupAssignments = new List<ServicePrincipalGroupAssignment>(),
+                        AppRoleAssignments = new List<AppRoleAssignment>()
+                    };
+
+                    try
+                    {
+                        // Get full application details including credentials
+                        var fullApp = await GetApplicationByAppIdAsync(app.AppId);
+                        if (fullApp != null)
+                        {
+                            backup.Application = fullApp;
+                            await LogAsync($"Retrieved full application details for {fullApp.DisplayName}");
+                        }
+
+                        var servicePrincipal = await GetServicePrincipalAsync(app.AppId);
+                        if (servicePrincipal != null)
+                        {
+                            await LogAsync($"Found service principal for {app.DisplayName}");
+
+                            // Create a clean ServicePrincipal object without backing store
+                            backup.ServicePrincipal = new ServicePrincipal
+                            {
+                                AppId = servicePrincipal.AppId,
+                                Id = servicePrincipal.Id,
+                                DisplayName = servicePrincipal.DisplayName,
+                                ServicePrincipalType = servicePrincipal.ServicePrincipalType,
+                                LoginUrl = servicePrincipal.LoginUrl,
+                                ReplyUrls = backup.Application?.Web?.RedirectUris?.ToList() ?? new List<string>(),
+                                PreferredSingleSignOnMode = servicePrincipal.PreferredSingleSignOnMode,
+                                Homepage = servicePrincipal.Homepage,
+                                Notes = servicePrincipal.Notes,
+                                LogoutUrl = servicePrincipal.LogoutUrl,
+                                SamlSingleSignOnSettings = servicePrincipal.SamlSingleSignOnSettings
+                            };
+
+                            // Backup user assignments
+                            await LogAsync("Backing up user assignments...");
+                            try
+                            {
+                                var userAssignments = await _graphClient.ServicePrincipals[servicePrincipal.Id].AppRoleAssignedTo
+                                    .GetAsync(requestConfiguration =>
+                                    {
+                                        requestConfiguration.QueryParameters.Select = new[] { "id", "principalId", "principalDisplayName", "appRoleId", "principalType" };
+                                        requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
+                                    });
+
+                                if (userAssignments?.Value != null)
+                                {
+                                    foreach (var assignment in userAssignments.Value)
+                                    {
+                                        // Filter for user assignments
+                                        if (assignment.PrincipalType?.ToString().Equals("User", StringComparison.OrdinalIgnoreCase) == true)
+                                        {
+                                            await LogAsync($"Found user assignment: {assignment.PrincipalDisplayName}");
+                                            backup.UserAssignments.Add(new ServicePrincipalUserAssignment
+                                            {
+                                                UserId = assignment.PrincipalId?.ToString(),
+                                                PrincipalDisplayName = assignment.PrincipalDisplayName,
+                                                AppRoleId = assignment.AppRoleId?.ToString()
+                                            });
+                                        }
+                                    }
+                                    await LogAsync($"Total user assignments found: {backup.UserAssignments.Count}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                await LogAsync($"Error backing up user assignments: {ex.Message}", true);
+                            }
+
+                            // Backup group assignments
+                            await LogAsync("Backing up group assignments...");
+                            try
+                            {
+                                var groupAssignments = await _graphClient.ServicePrincipals[servicePrincipal.Id].AppRoleAssignedTo
+                                    .GetAsync(requestConfiguration =>
+                                    {
+                                        requestConfiguration.QueryParameters.Select = new[] { "id", "principalId", "principalDisplayName", "appRoleId", "principalType" };
+                                        requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
+                                    });
+
+                                if (groupAssignments?.Value != null)
+                                {
+                                    foreach (var assignment in groupAssignments.Value)
+                                    {
+                                        // Filter for group assignments
+                                        if (assignment.PrincipalType?.ToString().Equals("Group", StringComparison.OrdinalIgnoreCase) == true)
+                                        {
+                                            await LogAsync($"Found group assignment: {assignment.PrincipalDisplayName}");
+                                            backup.GroupAssignments.Add(new ServicePrincipalGroupAssignment
+                                            {
+                                                GroupId = assignment.PrincipalId?.ToString(),
+                                                GroupDisplayName = assignment.PrincipalDisplayName,
+                                                AppRoleId = assignment.AppRoleId?.ToString()
+                                            });
+                                        }
+                                    }
+                                    await LogAsync($"Total group assignments found: {backup.GroupAssignments.Count}");
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                await LogAsync($"Error backing up group assignments: {ex.Message}", true);
+                            }
+
+                            // Backup claims configuration
+                            await LogAsync("Backing up claims configuration...");
+                            try
+                            {
+                                // Get standard claims mapping policies
+                                await LogAsync("Fetching standard claims mapping policies...");
+                                var standardPolicies = await _graphClient.Policies.ClaimsMappingPolicies
+                                    .GetAsync(requestConfiguration =>
+                                    {
+                                        requestConfiguration.QueryParameters.Select = new[] { "id", "displayName", "definition" };
+                                        requestConfiguration.Headers.Add("ConsistencyLevel", "eventual");
+                                    });
+
+                                if (standardPolicies?.Value?.Any() == true)
+                                {
+                                    await LogAsync($"Found {standardPolicies.Value.Count} standard claims mapping policies");
+                                }
+
+                                // Get assigned policies and SAML settings
+                                await LogAsync("Fetching service principal details...");
+                                var spDetails = await _graphClient.ServicePrincipals[servicePrincipal.Id]
+                                    .GetAsync(requestConfiguration =>
+                                    {
+                                        requestConfiguration.QueryParameters.Select = new[] {
+                                            "id",
+                                            "preferredSingleSignOnMode",
+                                            "samlSingleSignOnSettings"
+                                        };
+                                    });
+
+                                if (spDetails != null)
+                                {
+                                    await LogAsync($"Application SSO mode: {spDetails.PreferredSingleSignOnMode}");
+                                    if (spDetails.PreferredSingleSignOnMode?.ToString().Equals("saml", StringComparison.OrdinalIgnoreCase) == true)
+                                    {
+                                        await LogAsync("Application is SAML-based, fetching SAML configuration...");
+                                        var samlSettings = await _graphClient.ServicePrincipals[servicePrincipal.Id]
+                                            .GetAsync(requestConfiguration =>
+                                            {
+                                                requestConfiguration.QueryParameters.Select = new[] { "samlSingleSignOnSettings" };
+                                            });
+
+                                        if (samlSettings?.SamlSingleSignOnSettings != null)
+                                        {
+                                            await LogAsync($"Found SAML SSO settings with relay state: {samlSettings.SamlSingleSignOnSettings.RelayState}");
+                                            backup.ServicePrincipal.SamlSingleSignOnSettings = samlSettings.SamlSingleSignOnSettings;
+                                        }
+                                    }
+                                }
+
+                                // Get claims configuration using device code token if available
+                                if (!string.IsNullOrEmpty(defaultClaimsAccessToken))
+                                {
+                                    await LogAsync("Fetching application claims configuration...");
+                                    var tokenCredential = new TokenCredential(defaultClaimsAccessToken);
+                                    var requestAdapter = new HttpClientRequestAdapter(tokenCredential);
+                                    var claimsClient = new GraphServiceClient(requestAdapter);
+
+                                    var webConfig = await claimsClient.Applications[backup.Application.Id].GetAsync(requestConfiguration =>
+                                    {
+                                        requestConfiguration.QueryParameters.Select = new[] { "web" };
+                                    });
+
+                                    if (webConfig?.Web != null)
+                                    {
+                                        await LogAsync("Found web configuration");
+                                        if (webConfig.Web.ImplicitGrantSettings != null)
+                                        {
+                                            await LogAsync("Found implicit grant settings");
+                                        }
+                                        backup.Application.Web = webConfig.Web;
+                                    }
+
+                                    var spSettings = await claimsClient.ServicePrincipals[servicePrincipal.Id].GetAsync();
+                                    if (spSettings != null)
+                                    {
+                                        await LogAsync("Found service principal settings");
+                                        backup.ServicePrincipal.ClaimsMappingPolicies = spSettings.ClaimsMappingPolicies;
+                                    }
+
+                                    // Get user claims configuration
+                                    var userClaims = await claimsClient.ServicePrincipals[servicePrincipal.Id].ClaimsMappingPolicies
+                                        .GetAsync(requestConfiguration =>
+                                        {
+                                            requestConfiguration.QueryParameters.Select = new[] { "definition" };
+                                        });
+
+                                    if (userClaims?.Value != null)
+                                    {
+                                        await LogAsync("Found user claims configuration");
+                                        foreach (var claim in userClaims.Value)
+                                        {
+                                            if (claim.Definition != null)
+                                            {
+                                                foreach (var def in claim.Definition)
+                                                {
+                                                    if (def.Contains("groups", StringComparison.OrdinalIgnoreCase))
+                                                    {
+                                                        await LogAsync("Found SAML2 claim: groups (Properties: cloud_displayname)");
+                                                        await LogAsync("Found group membership claims: ApplicationGroup");
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                await LogAsync($"Error backing up claims configuration: {ex.Message}", true);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        await LogAsync($"Error backing up application {app.DisplayName}: {ex.Message}", true);
+                        continue;
+                    }
+
+                    backups.Add(backup);
+                }
+
+                var json = JsonSerializer.Serialize(backups, new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                });
+
+                await File.WriteAllTextAsync(savePath, json);
+                await LogAsync($"Backup completed successfully. Saved to: {savePath}");
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"Error during backup: {ex.Message}";
+                await LogAsync(errorMessage, true);
                 if (ex.InnerException != null)
                 {
                     await LogAsync($"Inner exception: {ex.InnerException.Message}", true);
                 }
-                throw;
+                throw new Exception(errorMessage, ex);
+            }
+        }
+
+        public async Task<List<ApplicationBackup>> LoadBackupAsync(string filePath)
+        {
+            try
+            {
+                var json = await File.ReadAllTextAsync(filePath);
+                await LogAsync($"Loading backup from: {filePath}");
+
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    ReferenceHandler = ReferenceHandler.Preserve,
+                    Converters =
+                    {
+                        new JsonStringEnumConverter()
+                    }
+                };
+
+                var backups = JsonSerializer.Deserialize<List<ApplicationBackup>>(json, options);
+
+                // Debug logging
+                foreach (var backup in backups ?? new List<ApplicationBackup>())
+                {
+                    await LogAsync($"Loaded backup for app: {backup.Application?.DisplayName}");
+
+                    // Log Service Principal details
+                    if (backup.ServicePrincipal != null)
+                    {
+                        await LogAsync($"Found Service Principal: {backup.ServicePrincipal.DisplayName}");
+                        await LogAsync($"Service Principal Type: {backup.ServicePrincipal.ServicePrincipalType}");
+                        await LogAsync($"Tags: {string.Join(", ", backup.ServicePrincipal.Tags ?? new List<string>())}");
+                        await LogAsync($"Login URL: {backup.ServicePrincipal.LoginUrl}");
+                        await LogAsync($"Key Credentials Count: {backup.ServicePrincipal.KeyCredentials?.Count ?? 0}");
+
+                        // Ensure all collections are initialized
+                        backup.ServicePrincipal.Tags ??= new List<string>();
+                        backup.ServicePrincipal.KeyCredentials ??= new List<KeyCredential>();
+                        backup.ServicePrincipal.PasswordCredentials ??= new List<PasswordCredential>();
+                        backup.ServicePrincipal.NotificationEmailAddresses ??= new List<string>();
+                    }
+                    else
+                    {
+                        await LogAsync("WARNING: No Service Principal found in backup!");
+                    }
+
+                    // Log Application details
+                    await LogAsync($"IdentifierUris count: {backup.Application?.IdentifierUris?.Count ?? 0}");
+                    if (backup.Application?.IdentifierUris?.Any() == true)
+                    {
+                        foreach (var uri in backup.Application.IdentifierUris)
+                        {
+                            await LogAsync($"Found IdentifierUri: {uri}");
+                        }
+                    }
+                    else
+                    {
+                        await LogAsync("No IdentifierUris found in backup");
+                    }
+                }
+
+                return backups ?? new List<ApplicationBackup>();
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"Error loading backup: {ex.Message}";
+                await LogAsync(errorMessage, true);
+                if (ex.InnerException != null)
+                {
+                    await LogAsync($"Inner exception: {ex.InnerException.Message}", true);
+                }
+                throw new Exception(errorMessage, ex);
+            }
+        }
+
+        public async Task<string> GetTenantId()
+        {
+            try
+            {
+                // Get organization details which includes tenant ID
+                var org = await _graphClient.Organization
+                    .GetAsync(requestConfiguration =>
+                    {
+                        requestConfiguration.QueryParameters.Select = new[] { "id" };
+                    });
+
+                var tenantId = org?.Value?.FirstOrDefault()?.Id;
+                if (string.IsNullOrEmpty(tenantId))
+                {
+                    throw new Exception("Could not retrieve tenant ID from organization details.");
+                }
+                return tenantId;
+            }
+            catch (Exception ex)
+            {
+                var errorMessage = $"Error getting tenant ID: {ex.Message}";
+                throw new Exception(errorMessage, ex);
             }
         }
 
@@ -697,8 +900,8 @@ namespace MSCloudNinjaGraphAPI.Services
                 {
                     // Log the entire backup object for debugging
                     await LogAsync("DEBUG: Dumping full backup object:");
-                    var backupJson = JsonSerializer.Serialize(backup, new JsonSerializerOptions 
-                    { 
+                    var backupJson = JsonSerializer.Serialize(backup, new JsonSerializerOptions
+                    {
                         WriteIndented = true,
                         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
                     });
@@ -719,8 +922,8 @@ namespace MSCloudNinjaGraphAPI.Services
                     DisplayName = sp.DisplayName,
                     PreferredSingleSignOnMode = "saml",
                     LoginUrl = sp.LoginUrl,
-                    Tags = new List<string> 
-                    { 
+                    Tags = new List<string>
+                    {
                         "WindowsAzureActiveDirectoryCustomSingleSignOnApplication",
                         "WindowsAzureActiveDirectoryIntegratedApp"
                     },
@@ -812,7 +1015,7 @@ namespace MSCloudNinjaGraphAPI.Services
                                 ResourceId = resourceId,
                                 AppRoleId = appRoleId
                             });
-                            
+
                             await LogAsync($"Restored role assignment for principal: {assignment.PrincipalId}");
                         }
                         catch (Exception ex)
@@ -940,107 +1143,152 @@ namespace MSCloudNinjaGraphAPI.Services
 
         public string FormatResourceAccess(IList<RequiredResourceAccess> access)
         {
-            if (access == null || !access.Any())
-                return string.Empty;
-
-            return string.Join(", ", access.Select(r => r.ResourceAppId));
+            if (access == null || !access.Any()) return string.Empty;
+            return JsonSerializer.Serialize(access, new JsonSerializerOptions { WriteIndented = true });
         }
 
         public string FormatApiSettings(ApiApplication api)
         {
-            if (api == null)
-                return string.Empty;
-
-            var settings = new List<string>();
-            if (api.Oauth2PermissionScopes?.Any() == true)
-                settings.Add($"Scopes: {api.Oauth2PermissionScopes.Count}");
-            if (api.PreAuthorizedApplications?.Any() == true)
-                settings.Add($"Pre-authorized apps: {api.PreAuthorizedApplications.Count}");
-            if (api.RequestedAccessTokenVersion.HasValue)
-                settings.Add($"Token version: {api.RequestedAccessTokenVersion}");
-
-            return string.Join(", ", settings);
+            if (api == null) return string.Empty;
+            return JsonSerializer.Serialize(api, new JsonSerializerOptions { WriteIndented = true });
         }
 
         public string FormatAppRoles(IList<AppRole> roles)
         {
-            if (roles == null || !roles.Any())
-                return string.Empty;
-
-            return string.Join(", ", roles.Select(r => r.DisplayName ?? r.Id.ToString()));
+            if (roles == null || !roles.Any()) return string.Empty;
+            return JsonSerializer.Serialize(roles, new JsonSerializerOptions { WriteIndented = true });
         }
 
         public string FormatInfo(InformationalUrl info)
         {
-            if (info == null)
-                return string.Empty;
-
-            var urls = new List<string>();
-            if (!string.IsNullOrEmpty(info.MarketingUrl))
-                urls.Add($"Marketing: {info.MarketingUrl}");
-            if (!string.IsNullOrEmpty(info.PrivacyStatementUrl))
-                urls.Add($"Privacy: {info.PrivacyStatementUrl}");
-            if (!string.IsNullOrEmpty(info.SupportUrl))
-                urls.Add($"Support: {info.SupportUrl}");
-            if (!string.IsNullOrEmpty(info.TermsOfServiceUrl))
-                urls.Add($"Terms: {info.TermsOfServiceUrl}");
-
-            return string.Join(", ", urls);
+            if (info == null) return string.Empty;
+            return JsonSerializer.Serialize(info, new JsonSerializerOptions { WriteIndented = true });
         }
 
         public IList<RequiredResourceAccess> ParseResourceAccess(string value)
         {
-            try
-            {
-                return !string.IsNullOrEmpty(value) 
-                    ? JsonSerializer.Deserialize<List<RequiredResourceAccess>>(value) 
-                    : new List<RequiredResourceAccess>();
-            }
-            catch
-            {
-                return new List<RequiredResourceAccess>();
-            }
+            if (string.IsNullOrWhiteSpace(value)) return new List<RequiredResourceAccess>();
+            return JsonSerializer.Deserialize<List<RequiredResourceAccess>>(value) ?? new List<RequiredResourceAccess>();
         }
 
         public ApiApplication ParseApiSettings(string value)
         {
-            try
-            {
-                return !string.IsNullOrEmpty(value)
-                    ? JsonSerializer.Deserialize<ApiApplication>(value)
-                    : new ApiApplication();
-            }
-            catch
-            {
-                return new ApiApplication();
-            }
+            if (string.IsNullOrWhiteSpace(value)) return new ApiApplication();
+            return JsonSerializer.Deserialize<ApiApplication>(value) ?? new ApiApplication();
         }
 
         public IList<AppRole> ParseAppRoles(string value)
         {
-            try
-            {
-                return !string.IsNullOrEmpty(value)
-                    ? JsonSerializer.Deserialize<List<AppRole>>(value)
-                    : new List<AppRole>();
-            }
-            catch
-            {
-                return new List<AppRole>();
-            }
+            if (string.IsNullOrWhiteSpace(value)) return new List<AppRole>();
+            return JsonSerializer.Deserialize<List<AppRole>>(value) ?? new List<AppRole>();
         }
 
         public InformationalUrl ParseInfo(string value)
         {
+            if (string.IsNullOrWhiteSpace(value)) return new InformationalUrl();
+            return JsonSerializer.Deserialize<InformationalUrl>(value) ?? new InformationalUrl();
+        }
+
+        private async Task<ServicePrincipal> GetServicePrincipalAsync(string appId)
+        {
+            var response = await _graphClient.ServicePrincipals.GetAsync(config =>
+            {
+                config.QueryParameters.Filter = $"appId eq '{appId}'";
+                config.QueryParameters.Select = new string[]
+                {
+                    "id",
+                    "appId",
+                    "displayName",
+                    "appRoleAssignmentRequired",
+                    "loginUrl",
+                    "logoutUrl",
+                    "preferredTokenSigningKeyThumbprint",
+                    "samlSingleSignOnSettings",
+                    "servicePrincipalType",
+                    "tags",
+                    "keyCredentials",
+                    "passwordCredentials",
+                    "notificationEmailAddresses"
+                };
+            });
+
+            return response?.Value?.FirstOrDefault();
+        }
+
+        private async Task<ServicePrincipal> GetServicePrincipalByAppIdAsync(string appId)
+        {
             try
             {
-                return !string.IsNullOrEmpty(value)
-                    ? JsonSerializer.Deserialize<InformationalUrl>(value)
-                    : new InformationalUrl();
+                var servicePrincipals = await _graphClient.ServicePrincipals
+                    .GetAsync(requestConfiguration =>
+                    {
+                        requestConfiguration.QueryParameters.Filter = $"appId eq '{appId}'";
+                        requestConfiguration.QueryParameters.Select = new[] {
+                            "id",
+                            "appId",
+                            "displayName",
+                            "servicePrincipalType",
+                            "loginUrl",
+                            "preferredTokenSigningKeyThumbprint",
+                            "tags",
+                            "notificationEmailAddresses",
+                            "keyCredentials",
+                            "passwordCredentials",
+                            "samlSingleSignOnSettings",
+                            "appRoleAssignmentRequired"
+                        };
+                    });
+
+                return servicePrincipals?.Value?.FirstOrDefault();
             }
-            catch
+            catch (Exception ex)
             {
-                return new InformationalUrl();
+                await LogAsync($"Error getting service principal for app {appId}: {ex.Message}", true);
+                return null;
+            }
+        }
+
+        private async Task<IEnumerable<AppRoleAssignment>> GetAppRoleAssignmentsAsync(string servicePrincipalId)
+        {
+            try
+            {
+                var assignments = await _graphClient.ServicePrincipals[servicePrincipalId].AppRoleAssignedTo
+                    .GetAsync(requestConfiguration =>
+                    {
+                        requestConfiguration.QueryParameters.Select = new[] {
+                            "id",
+                            "principalId",
+                            "principalDisplayName",
+                            "appRoleId",
+                            "principalType",
+                            "createdDateTime",
+                            "resourceId",
+                            "resourceDisplayName"
+                        };
+                    });
+
+                return assignments?.Value;
+            }
+            catch (Exception ex)
+            {
+                await LogAsync($"Error getting app role assignments for service principal {servicePrincipalId}: {ex.Message}", true);
+                return null;
+            }
+        }
+
+        private class TokenCredential : IAuthenticationProvider
+        {
+            private readonly string _token;
+
+            public TokenCredential(string token)
+            {
+                _token = token;
+            }
+
+            public Task AuthenticateRequestAsync(RequestInformation request, Dictionary<string, object>? additionalAuthenticationContext = null, CancellationToken cancellationToken = default)
+            {
+                request.Headers.Add("Authorization", $"Bearer {_token}");
+                return Task.CompletedTask;
             }
         }
     }
