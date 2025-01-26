@@ -7,12 +7,12 @@
       "RelativeMoniker": "D:0:0:{49BC5D77-50A5-487A-B74A-576327A72085}|MSCloudNinjaGraphAPI\\MSCloudNinjaGraphAPI.csproj|solutionrelative:mscloudninjagraphapi\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{49BC5D77-50A5-487A-B74A-576327A72085}|MSCloudNinjaGraphAPI\\MSCloudNinjaGraphAPI.csproj|c:\\users\\ofirga\\source\\repos\\mscloudninjacaptool\\mscloudninjagraphapi\\mscloudninjagraphapi.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|",
-      "RelativeMoniker": "D:0:0:{49BC5D77-50A5-487A-B74A-576327A72085}|MSCloudNinjaGraphAPI\\MSCloudNinjaGraphAPI.csproj|solutionrelative:mscloudninjagraphapi\\mscloudninjagraphapi.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{49BC5D77-50A5-487A-B74A-576327A72085}|MSCloudNinjaGraphAPI\\MSCloudNinjaGraphAPI.csproj|C:\\Users\\ofirga\\source\\repos\\MSCloudNinjaCAPTool\\mscloudninjagraphapi\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form",
       "RelativeMoniker": "D:0:0:{49BC5D77-50A5-487A-B74A-576327A72085}|MSCloudNinjaGraphAPI\\MSCloudNinjaGraphAPI.csproj|solutionrelative:mscloudninjagraphapi\\form1.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}|Form"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{49BC5D77-50A5-487A-B74A-576327A72085}|MSCloudNinjaGraphAPI\\MSCloudNinjaGraphAPI.csproj|c:\\users\\ofirga\\source\\repos\\mscloudninjacaptool\\mscloudninjagraphapi\\mscloudninjagraphapi.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|",
+      "RelativeMoniker": "D:0:0:{49BC5D77-50A5-487A-B74A-576327A72085}|MSCloudNinjaGraphAPI\\MSCloudNinjaGraphAPI.csproj|solutionrelative:mscloudninjagraphapi\\mscloudninjagraphapi.csproj||{04B8AB82-A572-4FEF-95CE-5222444B6B64}|"
     }
   ],
   "DocumentGroupContainers": [
@@ -40,14 +40,14 @@
               "RelativeDocumentMoniker": "MSCloudNinjaGraphAPI\\Form1.cs",
               "ToolTip": "C:\\Users\\ofirga\\source\\repos\\MSCloudNinjaCAPTool\\MSCloudNinjaGraphAPI\\Form1.cs",
               "RelativeToolTip": "MSCloudNinjaGraphAPI\\Form1.cs",
-              "ViewState": "AgIAADYAAAAAAAAAAAAIwDsAAAAZAAAAAAAAAA==",
+              "ViewState": "AgIAAC8AAAAAAAAAAAAnwEAAAAA+AAAAAAAAAA==",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
               "WhenOpened": "2025-01-15T14:36:07.442Z",
               "EditorCaption": ""
             },
             {
               "$type": "Document",
-              "DocumentIndex": 1,
+              "DocumentIndex": 2,
               "Title": "MSCloudNinjaGraphAPI",
               "DocumentMoniker": "C:\\Users\\ofirga\\source\\repos\\MSCloudNinjaCAPTool\\MSCloudNinjaGraphAPI\\MSCloudNinjaGraphAPI.csproj",
               "RelativeDocumentMoniker": "MSCloudNinjaGraphAPI\\MSCloudNinjaGraphAPI.csproj",
@@ -59,14 +59,15 @@
             },
             {
               "$type": "Document",
-              "DocumentIndex": 2,
+              "DocumentIndex": 1,
               "Title": "Form1.cs [Design]",
               "DocumentMoniker": "C:\\Users\\ofirga\\source\\repos\\MSCloudNinjaCAPTool\\MSCloudNinjaGraphAPI\\Form1.cs",
               "RelativeDocumentMoniker": "MSCloudNinjaGraphAPI\\Form1.cs",
               "ToolTip": "C:\\Users\\ofirga\\source\\repos\\MSCloudNinjaCAPTool\\MSCloudNinjaGraphAPI\\Form1.cs [Design]",
               "RelativeToolTip": "MSCloudNinjaGraphAPI\\Form1.cs [Design]",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
-              "WhenOpened": "2025-01-02T00:06:00.436Z"
+              "WhenOpened": "2025-01-02T00:06:00.436Z",
+              "EditorCaption": " [Design]"
             }
           ]
         }

@@ -62,7 +62,7 @@ namespace MSCloudNinjaGraphAPI
             InitializeComponent();
             UseImmersiveDarkMode(Handle, true); // Enable dark mode for title bar
             this.Size = new Size(1200, 800);
-            this.Text = "User Offboarding Tool";
+            this.Text = "User Offboarding Tool by MSCloudNinja";
             SetupAuthPanel();
         }
 
