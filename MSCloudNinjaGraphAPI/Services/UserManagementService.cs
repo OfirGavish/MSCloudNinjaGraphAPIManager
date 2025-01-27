@@ -16,6 +16,7 @@ namespace MSCloudNinjaGraphAPI.Services
         Task RemoveFromGlobalAddressListAsync(string userId);
         Task RemoveFromAllGroupsAsync(string userId);
         Task UpdateManagerForEmployeesAsync(string userId);
+        Task RemoveUserLicensesAsync(string userId);
     }
 
     public class UserManagementService : IUserManagementService
@@ -199,6 +200,40 @@ namespace MSCloudNinjaGraphAPI.Services
                 {
                     OdataId = $"https://graph.microsoft.com/v1.0/users/{manager.Id}"
                 });
+            }
+        }
+
+        public async Task RemoveUserLicensesAsync(string userId)
+        {
+            try
+            {
+                // Get user's assigned licenses
+                var user = await _graphClient.Users[userId].GetAsync(requestConfiguration =>
+                {
+                    requestConfiguration.QueryParameters.Select = new[] { "assignedLicenses" };
+                });
+
+                if (user?.AssignedLicenses == null || !user.AssignedLicenses.Any())
+                {
+                    await _logService.LogAsync($"No licenses found for user {userId}");
+                    return;
+                }
+
+                // Create request to remove all licenses
+                var requestBody = new Microsoft.Graph.Users.Item.AssignLicense.AssignLicensePostRequestBody
+                {
+                    AddLicenses = new List<Microsoft.Graph.Models.AssignedLicense>(),
+                    RemoveLicenses = user.AssignedLicenses.Select(l => l.SkuId).ToList()
+                };
+
+                // Remove licenses
+                await _graphClient.Users[userId].AssignLicense.PostAsync(requestBody);
+                await _logService.LogAsync($"Removed {user.AssignedLicenses.Count} licenses from user {userId}");
+            }
+            catch (Exception ex)
+            {
+                await _logService.LogAsync($"Error removing licenses for user {userId}: {ex.Message}", true);
+                throw;
             }
         }
     }

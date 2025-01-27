@@ -13,19 +13,25 @@ namespace MSCloudNinjaGraphAPI.Controls
     public partial class UserOffboardingControl : UserControl
     {
         private readonly IUserManagementService _userService;
+        private readonly LogService _logService;
         private List<User> _users;
         private DataGridView usersGrid;
-        private Label statusLabel;
         private Label countLabel;
-        private Panel actionPanel;
-        private Panel searchPanel;
-        private TextBox searchBox;
+        private Label statusLabel;
+        private ProgressBar progressBar;
         private CheckBox chkDisableUser;
         private CheckBox chkRemoveFromGAL;
         private CheckBox chkRemoveFromGroups;
+        private CheckBox chkRemoveLicenses;
         private CheckBox chkUpdateManager;
         private Button btnExecute;
         private BindingSource bindingSource;
+        private Panel contentPanel;
+        private Panel gridContainer;
+        private Panel actionPanel;
+        private FlowLayoutPanel searchPanel;
+        private TextBox searchBox;
+        private Label searchLabel;
 
         public UserOffboardingControl(GraphServiceClient graphClient)
         {
@@ -33,19 +39,25 @@ namespace MSCloudNinjaGraphAPI.Controls
             _users = new List<User>();
             bindingSource = new BindingSource();
 
-            // Initialize UI components
+            InitializeUI();
+
+            // Load users
+            LoadUsers();
+        }
+
+        private void InitializeUI()
+        {
             this.Dock = DockStyle.Fill;
             this.BackColor = Color.FromArgb(30, 30, 30);
-            this.Padding = new Padding(10, 70, 10, 10); // Add top padding to account for header
+            this.Padding = new Padding(0, 40, 0, 0);
 
             // Create search panel
-            searchPanel = new Panel
+            searchPanel = new FlowLayoutPanel
             {
-                Height = 50,
+                Height = 40,
                 Dock = DockStyle.Top,
                 BackColor = Color.FromArgb(45, 45, 48),
-                Padding = new Padding(10),
-                Margin = new Padding(0, 0, 0, 10)
+                Padding = new Padding(10, 8, 10, 8)
             };
 
             var searchLabel = new Label
@@ -53,14 +65,14 @@ namespace MSCloudNinjaGraphAPI.Controls
                 Text = "Search:",
                 ForeColor = Color.White,
                 AutoSize = true,
-                Location = new Point(10, 15)
+                Margin = new Padding(0, 4, 5, 0)
             };
 
             searchBox = new TextBox
             {
                 Width = 300,
                 Height = 25,
-                Location = new Point(70, 12),
+                Left = 100,
                 BackColor = Color.FromArgb(30, 30, 30),
                 ForeColor = Color.White,
                 BorderStyle = BorderStyle.FixedSingle
@@ -69,41 +81,7 @@ namespace MSCloudNinjaGraphAPI.Controls
 
             searchPanel.Controls.AddRange(new Control[] { searchLabel, searchBox });
 
-            // Create status panel at the bottom
-            var statusPanel = new Panel
-            {
-                Height = 40,
-                Dock = DockStyle.Bottom,
-                BackColor = Color.FromArgb(45, 45, 48),
-                Padding = new Padding(10, 5, 10, 5)
-            };
-
-            statusLabel = new Label
-            {
-                ForeColor = Color.White,
-                Text = "Ready",
-                AutoSize = true,
-                Location = new Point(10, 10)
-            };
-
-            countLabel = new Label
-            {
-                ForeColor = Color.White,
-                Text = "Users: 0",
-                AutoSize = true,
-                Location = new Point(200, 10)
-            };
-
-            statusPanel.Controls.AddRange(new Control[] { statusLabel, countLabel });
-
-            // Create main content panel with padding
-            var contentPanel = new Panel
-            {
-                Dock = DockStyle.Fill,
-                Padding = new Padding(0, 10, 0, 0)
-            };
-
-            // Create action panel on the right
+            // Create action panel
             actionPanel = new Panel
             {
                 Width = 250,
@@ -112,20 +90,22 @@ namespace MSCloudNinjaGraphAPI.Controls
                 Padding = new Padding(10)
             };
 
-            // Create checkboxes for actions
             var actionsLabel = new Label
             {
                 Text = "Actions",
                 ForeColor = Color.White,
-                Font = new Font("Segoe UI", 12, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(10, 20)
+                Font = new Font(this.Font.FontFamily, 12, FontStyle.Bold),
+                Location = new Point(10, 10)
             };
+            actionPanel.Controls.Add(actionsLabel);
 
+            // Create checkboxes
             chkDisableUser = CreateCheckBox("Disable user account", new Point(10, 50));
             chkRemoveFromGAL = CreateCheckBox("Remove from Global Address List", new Point(10, 80));
             chkRemoveFromGroups = CreateCheckBox("Remove from all groups", new Point(10, 110));
-            chkUpdateManager = CreateCheckBox("Update manager for direct reports", new Point(10, 140));
+            chkRemoveLicenses = CreateCheckBox("Remove all 365 licenses", new Point(10, 140));
+            chkUpdateManager = CreateCheckBox("Update manager for direct reports", new Point(10, 170));
 
             btnExecute = new Button
             {
@@ -134,28 +114,56 @@ namespace MSCloudNinjaGraphAPI.Controls
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Size = new Size(200, 40),
-                Location = new Point(25, 180)
+                Location = new Point(25, 210)
             };
             btnExecute.Click += BtnExecute_Click;
 
-            actionPanel.Controls.AddRange(new Control[] 
-            { 
+            actionPanel.Controls.AddRange(new Control[]
+            {
                 actionsLabel,
-                chkDisableUser, 
-                chkRemoveFromGAL, 
-                chkRemoveFromGroups, 
+                chkDisableUser,
+                chkRemoveFromGAL,
+                chkRemoveFromGroups,
+                chkRemoveLicenses,
                 chkUpdateManager,
-                btnExecute 
+                btnExecute
             });
 
-            // Create grid container panel
-            var gridContainer = new Panel
+            // Create status panel
+            var statusPanel = new Panel
             {
-                Dock = DockStyle.Fill,
-                Padding = new Padding(0, 10, 10, 10)
+                Height = 40,
+                Dock = DockStyle.Bottom,
+                BackColor = Color.FromArgb(45, 45, 48)
             };
 
-            // Create users grid
+            statusLabel = new Label
+            {
+                Text = "Ready",
+                ForeColor = Color.White,
+                AutoSize = true,
+                Location = new Point(10, 10)
+            };
+
+            countLabel = new Label
+            {
+                Text = "Users: 0",
+                ForeColor = Color.White,
+                AutoSize = true,
+                Location = new Point(200, 10)
+            };
+
+            progressBar = new ProgressBar
+            {
+                Width = 200,
+                Height = 20,
+                Location = new Point(400, 10),
+                Visible = false
+            };
+
+            statusPanel.Controls.AddRange(new Control[] { statusLabel, countLabel, progressBar });
+
+            // Create grid
             usersGrid = new DataGridView
             {
                 Dock = DockStyle.Fill,
@@ -195,22 +203,29 @@ namespace MSCloudNinjaGraphAPI.Controls
                 Padding = new Padding(5, 0, 0, 0)
             };
 
-            // Enable sorting
+            usersGrid.CellClick += (s, e) =>
+            {
+                if (e.ColumnIndex == usersGrid.Columns["Selected"].Index && e.RowIndex >= 0)
+                {
+                    var currentValue = Convert.ToBoolean(usersGrid.Rows[e.RowIndex].Cells["Selected"].Value);
+                    usersGrid.Rows[e.RowIndex].Cells["Selected"].Value = !currentValue;
+                }
+            };
             usersGrid.Sorted += UsersGrid_Sorted;
 
             // Add columns to grid with improved headers
             usersGrid.Columns.AddRange(new DataGridViewColumn[]
             {
-                new DataGridViewCheckBoxColumn 
-                { 
+                new DataGridViewCheckBoxColumn
+                {
                     Name = "Selected",
                     HeaderText = "",
                     Width = 30,
                     ReadOnly = false,
                     SortMode = DataGridViewColumnSortMode.NotSortable
                 },
-                new DataGridViewTextBoxColumn 
-                { 
+                new DataGridViewTextBoxColumn
+                {
                     Name = "DisplayName",
                     HeaderText = "DISPLAY NAME",
                     DataPropertyName = "DisplayName",
@@ -218,25 +233,26 @@ namespace MSCloudNinjaGraphAPI.Controls
                     ReadOnly = true,
                     SortMode = DataGridViewColumnSortMode.Automatic
                 },
-                new DataGridViewTextBoxColumn 
-                { 
+                new DataGridViewTextBoxColumn
+                {
                     Name = "UserPrincipalName",
-                    HeaderText = "EMAIL ADDRESS",
+                    HeaderText = "Username",
                     DataPropertyName = "UserPrincipalName",
                     Width = 250,
                     ReadOnly = true,
                     SortMode = DataGridViewColumnSortMode.Automatic
                 },
-                new DataGridViewTextBoxColumn 
-                { 
+                new DataGridViewTextBoxColumn
+                {
                     Name = "Status",
-                    HeaderText = "LOGIN STATUS",
+                    HeaderText = "STATUS",
+                    DataPropertyName = "AccountEnabled",
                     Width = 100,
                     ReadOnly = true,
                     SortMode = DataGridViewColumnSortMode.Automatic
                 },
-                new DataGridViewTextBoxColumn 
-                { 
+                new DataGridViewTextBoxColumn
+                {
                     Name = "Department",
                     HeaderText = "DEPARTMENT",
                     DataPropertyName = "Department",
@@ -244,8 +260,8 @@ namespace MSCloudNinjaGraphAPI.Controls
                     ReadOnly = true,
                     SortMode = DataGridViewColumnSortMode.Automatic
                 },
-                new DataGridViewTextBoxColumn 
-                { 
+                new DataGridViewTextBoxColumn
+                {
                     Name = "JobTitle",
                     HeaderText = "JOB TITLE",
                     DataPropertyName = "JobTitle",
@@ -255,17 +271,63 @@ namespace MSCloudNinjaGraphAPI.Controls
                 }
             });
 
-            gridContainer.Controls.Add(usersGrid);
-            contentPanel.Controls.Add(gridContainer);
+            usersGrid.CellFormatting += (s, e) =>
+            {
+                if (e.ColumnIndex == usersGrid.Columns["Status"].Index && e.RowIndex >= 0)
+                {
+                    var user = usersGrid.Rows[e.RowIndex].DataBoundItem as User;
+                    if (user != null)
+                    {
+                        e.Value = user.AccountEnabled == true ? "Enabled" : "Disabled";
+                        e.FormattingApplied = true;
+                    }
+                }
+            };
 
-            // Add controls to form in the correct order
-            this.Controls.Add(contentPanel);
-            this.Controls.Add(actionPanel);
-            this.Controls.Add(statusPanel);
-            this.Controls.Add(searchPanel);
+            // Create main container with padding for spacing
+            var mainContainer = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(0, 40, 0, 0)
+            };
 
-            // Load users
-            LoadUsers();
+            // Add controls to form
+            mainContainer.Controls.Add(usersGrid);
+            this.Controls.AddRange(new Control[] { searchPanel, actionPanel, statusPanel, mainContainer });
+
+            // Initialize binding source
+            bindingSource = new BindingSource();
+        }
+
+        public async Task LoadUsers()
+        {
+            try
+            {
+                statusLabel.Text = "Loading users...";
+                btnExecute.Enabled = false;
+                _users = await _userService.GetAllUsersAsync();
+
+                bindingSource.DataSource = _users;
+                usersGrid.DataSource = bindingSource;
+
+                // Set all checkboxes to unchecked initially and set status text
+                foreach (DataGridViewRow row in usersGrid.Rows)
+                {
+                    row.Cells["Selected"].Value = false;
+                }
+
+                countLabel.Text = $"Users: {_users.Count}";
+                statusLabel.Text = "Ready";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading users: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                statusLabel.Text = "Error loading users";
+            }
+            finally
+            {
+                btnExecute.Enabled = true;
+            }
         }
 
         private void SearchBox_TextChanged(object sender, EventArgs e)
@@ -279,7 +341,7 @@ namespace MSCloudNinjaGraphAPI.Controls
             }
             else
             {
-                var filteredList = _users.Where(u => 
+                var filteredList = _users.Where(u =>
                     (u.DisplayName?.ToLower().Contains(searchText) ?? false) ||
                     (u.UserPrincipalName?.ToLower().Contains(searchText) ?? false) ||
                     (u.Department?.ToLower().Contains(searchText) ?? false) ||
@@ -306,50 +368,11 @@ namespace MSCloudNinjaGraphAPI.Controls
             }
         }
 
-        private async void LoadUsers()
-        {
-            try
-            {
-                statusLabel.Text = "Loading users...";
-                _users = await _userService.GetAllUsersAsync();
-                
-                bindingSource.DataSource = _users;
-                usersGrid.DataSource = bindingSource;
-
-                // Set all checkboxes to unchecked initially and set status text
-                foreach (DataGridViewRow row in usersGrid.Rows)
-                {
-                    row.Cells["Selected"].Value = false;
-                    row.Cells["Status"].Value = ((bool?)row.DataBoundItem.GetType().GetProperty("AccountEnabled")?.GetValue(row.DataBoundItem) ?? false) 
-                        ? "Enabled" 
-                        : "Disabled";
-                }
-
-                countLabel.Text = $"Users: {_users.Count}";
-                statusLabel.Text = "Ready";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error loading users: {ex.Message}", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                statusLabel.Text = "Error loading users";
-            }
-        }
-
         private async void BtnExecute_Click(object sender, EventArgs e)
         {
             try
             {
-                // Get selected users
-                var selectedUsers = new List<User>();
-                foreach (DataGridViewRow row in usersGrid.Rows)
-                {
-                    if (Convert.ToBoolean(row.Cells["Selected"].Value))
-                    {
-                        selectedUsers.Add(_users[row.Index]);
-                    }
-                }
-
+                var selectedUsers = GetSelectedUsers();
                 if (!selectedUsers.Any())
                 {
                     MessageBox.Show("Please select at least one user.", "No Users Selected",
@@ -357,80 +380,124 @@ namespace MSCloudNinjaGraphAPI.Controls
                     return;
                 }
 
-                if (!chkDisableUser.Checked && !chkRemoveFromGAL.Checked && 
-                    !chkRemoveFromGroups.Checked && !chkUpdateManager.Checked)
+                if (!chkDisableUser.Checked && !chkRemoveFromGAL.Checked &&
+                    !chkRemoveFromGroups.Checked && !chkRemoveLicenses.Checked && !chkUpdateManager.Checked)
                 {
                     MessageBox.Show("Please select at least one action to perform.", "No Actions Selected",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                var message = $"Are you sure you want to perform the selected actions on {selectedUsers.Count} user(s)?";
-                if (MessageBox.Show(message, "Confirm Actions", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
-                {
-                    return;
-                }
+                var confirmResult = MessageBox.Show(
+                    "Are you sure you want to perform the selected actions on the selected users?",
+                    "Confirm Actions", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
 
-                btnExecute.Enabled = false;
+                if (confirmResult != DialogResult.Yes)
+                    return;
+
+                SetControlsEnabled(false);
+                progressBar.Visible = true;
                 statusLabel.Text = "Executing actions...";
 
                 var totalActions = selectedUsers.Count * (new[] { chkDisableUser.Checked, chkRemoveFromGAL.Checked,
-                    chkRemoveFromGroups.Checked, chkUpdateManager.Checked }).Count(x => x);
+                    chkRemoveFromGroups.Checked, chkRemoveLicenses.Checked, chkUpdateManager.Checked }).Count(x => x);
                 var completedActions = 0;
 
                 foreach (var user in selectedUsers)
                 {
-                    statusLabel.Text = $"Processing user: {user.DisplayName}";
-
-                    if (chkDisableUser.Checked)
+                    try
                     {
-                        await _userService.DisableUserAsync(user.Id);
-                        completedActions++;
-                        UpdateProgress(completedActions, totalActions);
+                        if (chkDisableUser.Checked)
+                        {
+                            await _userService.DisableUserAsync(user.Id);
+                            completedActions++;
+                            UpdateProgress(completedActions, totalActions);
+                        }
+
+                        if (chkRemoveFromGAL.Checked)
+                        {
+                            await _userService.RemoveFromGlobalAddressListAsync(user.Id);
+                            completedActions++;
+                            UpdateProgress(completedActions, totalActions);
+                        }
+
+                        if (chkRemoveFromGroups.Checked)
+                        {
+                            await _userService.RemoveFromAllGroupsAsync(user.Id);
+                            completedActions++;
+                            UpdateProgress(completedActions, totalActions);
+                        }
+
+                        if (chkRemoveLicenses.Checked)
+                        {
+                            await _userService.RemoveUserLicensesAsync(user.Id);
+                            completedActions++;
+                            UpdateProgress(completedActions, totalActions);
+                        }
+
+                        if (chkUpdateManager.Checked)
+                        {
+                            await _userService.UpdateManagerForEmployeesAsync(user.Id);
+                            completedActions++;
+                            UpdateProgress(completedActions, totalActions);
+                        }
                     }
-
-                    if (chkRemoveFromGAL.Checked)
+                    catch (Exception ex)
                     {
-                        await _userService.RemoveFromGlobalAddressListAsync(user.Id);
-                        completedActions++;
-                        UpdateProgress(completedActions, totalActions);
-                    }
-
-                    if (chkRemoveFromGroups.Checked)
-                    {
-                        await _userService.RemoveFromAllGroupsAsync(user.Id);
-                        completedActions++;
-                        UpdateProgress(completedActions, totalActions);
-                    }
-
-                    if (chkUpdateManager.Checked)
-                    {
-                        await _userService.UpdateManagerForEmployeesAsync(user.Id);
-                        completedActions++;
-                        UpdateProgress(completedActions, totalActions);
+                        await _logService.LogAsync($"Error processing user {user.UserPrincipalName}: {ex.Message}", true);
                     }
                 }
 
-                statusLabel.Text = "Actions completed successfully";
-                await Task.Delay(1000); // Brief delay to show completion
-                LoadUsers(); // Refresh the grid
+                await LoadUsers();
+                MessageBox.Show("Selected operations completed successfully.", "Success",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error executing actions: {ex.Message}", "Error",
+                await _logService.LogAsync($"Error executing actions: {ex.Message}", true);
+                MessageBox.Show($"An error occurred: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
-                statusLabel.Text = "Error executing actions";
             }
             finally
             {
-                btnExecute.Enabled = true;
+                SetControlsEnabled(true);
+                progressBar.Visible = false;
+                statusLabel.Text = "Ready";
             }
+        }
+
+        private List<User> GetSelectedUsers()
+        {
+            var selectedUsers = new List<User>();
+            foreach (DataGridViewRow row in usersGrid.Rows)
+            {
+                if (Convert.ToBoolean(row.Cells["Selected"].Value))
+                {
+                    selectedUsers.Add(_users[row.Index]);
+                }
+            }
+            return selectedUsers;
         }
 
         private void UpdateProgress(int completed, int total)
         {
             var percentage = (int)((float)completed / total * 100);
             statusLabel.Text = $"Progress: {percentage}%";
+        }
+
+        private void SetControlsEnabled(bool enabled)
+        {
+            chkDisableUser.Enabled = enabled;
+            chkRemoveFromGAL.Enabled = enabled;
+            chkRemoveFromGroups.Enabled = enabled;
+            chkRemoveLicenses.Enabled = enabled;
+            chkUpdateManager.Enabled = enabled;
+            btnExecute.Enabled = enabled;
+        }
+
+        private void InitializeComponent()
+        {
+
         }
 
         private CheckBox CreateCheckBox(string text, Point location)
